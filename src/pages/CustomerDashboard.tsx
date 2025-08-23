@@ -213,27 +213,27 @@ const CustomerDashboard = () => {
                             <CardContent>
                               <div className="space-y-4">
                                 <div className="flex items-center justify-between text-sm">
-                                  <div className="flex items-center gap-4">
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="w-4 h-4 text-muted-foreground" />
-                                      <span>{service.duration_minutes} min</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <User className="w-4 h-4 text-muted-foreground" />
-                                      <span>1 provider</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center justify-between">
-                                  <div className="text-right">
-                                    <span className="text-2xl font-bold text-teal">
-                                      ${service.base_price}
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                      {service.price_type === 'hourly' ? '/hr' : ''}
-                                    </span>
-                                  </div>
+                                   <div className="flex items-center gap-4">
+                                     <div className="flex items-center gap-1">
+                                       <Clock className="w-4 h-4 text-muted-foreground" />
+                                       <span>{service.duration_minutes} min</span>
+                                     </div>
+                                     <div className="flex items-center gap-1">
+                                       <User className="w-4 h-4 text-muted-foreground" />
+                                       <span>6+ providers</span>
+                                     </div>
+                                   </div>
+                                 </div>
+                                 
+                                 <div className="flex items-center justify-between">
+                                   <div className="text-right">
+                                     <span className="text-lg font-bold text-teal">
+                                       Starting from ${Math.round(service.base_price * 0.6)}
+                                     </span>
+                                     <span className="text-muted-foreground">
+                                       {service.price_type === 'hourly' ? '/hr' : ''}
+                                     </span>
+                                   </div>
                                 </div>
                                 
                                 <Button 
