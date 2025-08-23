@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -36,6 +36,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileRole, setProfileRole] = useState<AppRole | null>(null);
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
 
   // Helper to load role from profiles
   const loadProfileRole = async (userId: string | undefined | null) => {
@@ -73,6 +75,62 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  // Auto logout after inactivity
+  const handleAutoLogout = useCallback(async () => {
+    console.log('[Auth] Auto logout due to inactivity');
+    toast({
+      title: "Session Expired",
+      description: "You have been logged out due to inactivity.",
+      variant: "destructive",
+    });
+    await signOut();
+  }, []);
+
+  // Reset inactivity timer
+  const resetInactivityTimer = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    
+    // Only set timer if user is logged in
+    if (user) {
+      inactivityTimerRef.current = setTimeout(() => {
+        handleAutoLogout();
+      }, 30 * 60 * 1000); // 30 minutes
+    }
+  }, [user, handleAutoLogout]);
+
+  // Track user activity
+  useEffect(() => {
+    if (!user) return;
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const resetTimer = () => {
+      resetInactivityTimer();
+    };
+
+    // Add event listeners
+    events.forEach(event => {
+      document.addEventListener(event, resetTimer, true);
+    });
+
+    // Start the timer
+    resetInactivityTimer();
+
+    // Cleanup
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, resetTimer, true);
+      });
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [user, resetInactivityTimer]);
+
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -87,6 +145,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           await loadProfileRole(nextUser.id);
         } else {
           setProfileRole(null);
+          // Clear inactivity timer when user logs out
+          if (inactivityTimerRef.current) {
+            clearTimeout(inactivityTimerRef.current);
+            inactivityTimerRef.current = null;
+          }
         }
         
         setLoading(false);
@@ -191,6 +254,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const signOut = async () => {
     console.log('[Auth] Starting signout process');
     
+    // Clear inactivity timer before signing out
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    
     const { error } = await supabase.auth.signOut();
     
     if (error) {
@@ -203,7 +272,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } else {
       // Clear local state
       setProfileRole(null);
+      setUser(null);
+      setSession(null);
       console.log('[Auth] Signout successful');
+      
+      // Navigate to home page after successful logout
+      window.location.href = '/';
     }
 
     return { error };

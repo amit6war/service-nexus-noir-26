@@ -11,9 +11,23 @@ const Header: React.FC = () => {
   const [searchFocused, setSearchFocused] = useState(false);
   const [notificationCount] = useState(3);
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+  const handleSignOut = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('[Header] Logout button clicked');
+    
+    try {
+      const { error } = await signOut();
+      if (!error) {
+        console.log('[Header] Logout successful, redirecting to home');
+        // The signOut function now handles navigation
+      } else {
+        console.error('[Header] Logout failed:', error);
+      }
+    } catch (error) {
+      console.error('[Header] Logout error:', error);
+    }
   };
 
   return (
@@ -38,9 +52,10 @@ const Header: React.FC = () => {
               </motion.button>
             </div>
             <motion.h1 
-              className="text-xl font-bold text-gradient"
+              className="text-xl font-bold text-gradient cursor-pointer"
               whileHover={{ scale: 1.02 }}
               transition={{ type: "spring", stiffness: 400 }}
+              onClick={() => navigate('/')}
             >
               ServiceLink NB
             </motion.h1>
@@ -173,6 +188,7 @@ const Header: React.FC = () => {
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
                   className="p-2 rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors"
+                  title="Sign Out"
                 >
                   <LogOut className="w-5 h-5" />
                 </motion.button>
@@ -187,7 +203,7 @@ const Header: React.FC = () => {
                 Sign In
               </motion.button>
             )}
-          </motion.div>
+          </div>
         </div>
       </div>
     </header>
