@@ -35,6 +35,8 @@ export const useServices = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  console.log('useServices hook initialized, loading:', loading);
+
   const fetchServices = useCallback(async () => {
     try {
       setLoading(true);
@@ -147,6 +149,7 @@ export const useServices = () => {
   }, [toast]);
 
   useEffect(() => {
+    console.log('useEffect triggered, calling fetchServices');
     fetchServices();
   }, [fetchServices]);
 

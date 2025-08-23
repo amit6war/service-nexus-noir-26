@@ -38,6 +38,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ServiceBrowser from '@/components/ServiceBrowser';
+import TestServiceFetch from '@/components/TestServiceFetch';
 import CartSidebar from '@/components/CartSidebar';
 import { useCart } from '@/hooks/useCart';
 
@@ -527,7 +528,10 @@ const CustomerDashboard = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
               >
-                <ServiceBrowser />
+                <TestServiceFetch />
+                <div className="mt-6">
+                  <ServiceBrowser />
+                </div>
               </motion.div>
             )}
 
