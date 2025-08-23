@@ -1,11 +1,11 @@
 
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CreditCard, MapPin, Trash2, ShoppingCart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
@@ -21,7 +21,6 @@ const Checkout = () => {
   
   // Form states
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-  const [specialInstructions, setSpecialInstructions] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('card');
 
   const handleAddressSelect = (address: Address) => {
@@ -152,26 +151,6 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
-            {/* Special Instructions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Additional Instructions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Special Instructions (Optional)
-                  </label>
-                  <Textarea
-                    placeholder="Any special instructions or requirements..."
-                    value={specialInstructions}
-                    onChange={(e) => setSpecialInstructions(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Payment Method */}
             <Card>
               <CardHeader>
@@ -298,3 +277,4 @@ const Checkout = () => {
 };
 
 export default Checkout;
+
