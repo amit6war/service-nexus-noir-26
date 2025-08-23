@@ -23,98 +23,92 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
 
   if (!selectedService) return null;
 
-  // Generate 6 dummy providers for each service with varied pricing
-  const generateDummyProviders = (service: Service) => {
+  // Generate 6 providers for each service with varied pricing
+  const generateProviders = (service: Service) => {
     const basePrice = service.base_price || 100;
-    const maxPrice = basePrice * 1.5; // Admin set maximum (50% above base)
+    const maxPrice = basePrice * 1.5;
     
     return [
       {
         id: 'provider-1',
+        user_id: 'provider-1',
         business_name: 'Elite Professional Services',
         rating: 4.9,
         total_reviews: 247,
-        user_id: 'provider-1',
         verification_status: 'approved',
-        description: 'Premium quality service with 10+ years experience. Specialized in high-end residential and commercial projects.',
+        description: 'Premium quality service with 10+ years experience.',
         years_experience: 12,
-        portfolio_images: [],
-        price: Math.round(maxPrice * 1.0), // 100% of max price
+        price: Math.round(maxPrice * 1.0),
         availability: 'Available today',
         location: 'Downtown Area',
         certifications: ['Licensed', 'Insured', 'Bonded']
       },
       {
         id: 'provider-2',
+        user_id: 'provider-2',
         business_name: 'Reliable Home Solutions',
         rating: 4.7,
         total_reviews: 189,
-        user_id: 'provider-2',
         verification_status: 'approved',
-        description: 'Fast and efficient service delivery with same-day availability for urgent needs.',
+        description: 'Fast and efficient service delivery.',
         years_experience: 8,
-        portfolio_images: [],
-        price: Math.round(maxPrice * 0.85), // 85% of max price
+        price: Math.round(maxPrice * 0.85),
         availability: 'Available tomorrow',
         location: 'North Side',
         certifications: ['Licensed', 'Insured']
       },
       {
         id: 'provider-3',
+        user_id: 'provider-3',
         business_name: 'Expert Care Team',
         rating: 4.6,
         total_reviews: 156,
-        user_id: 'provider-3',
         verification_status: 'approved',
-        description: 'Specialized team with focus on quality and customer satisfaction.',
+        description: 'Specialized team with focus on quality.',
         years_experience: 6,
-        portfolio_images: [],
-        price: Math.round(maxPrice * 0.75), // 75% of max price
+        price: Math.round(maxPrice * 0.75),
         availability: 'Available this week',
         location: 'East District',
         certifications: ['Licensed']
       },
       {
         id: 'provider-4',
+        user_id: 'provider-4',
         business_name: 'Quick Fix Professionals',
         rating: 4.8,
         total_reviews: 203,
-        user_id: 'provider-4',
         verification_status: 'approved',
-        description: 'Emergency services available 24/7 with rapid response times.',
+        description: 'Emergency services available 24/7.',
         years_experience: 9,
-        portfolio_images: [],
-        price: Math.round(maxPrice * 0.90), // 90% of max price
+        price: Math.round(maxPrice * 0.90),
         availability: 'Available now',
         location: 'West Side',
         certifications: ['Licensed', 'Insured', '24/7 Emergency']
       },
       {
         id: 'provider-5',
+        user_id: 'provider-5',
         business_name: 'Budget Friendly Services',
         rating: 4.4,
         total_reviews: 128,
-        user_id: 'provider-5',
         verification_status: 'approved',
-        description: 'Affordable rates without compromising on quality. Perfect for budget-conscious customers.',
+        description: 'Affordable rates without compromising quality.',
         years_experience: 5,
-        portfolio_images: [],
-        price: Math.round(maxPrice * 0.60), // 60% of max price
+        price: Math.round(maxPrice * 0.60),
         availability: 'Available next week',
         location: 'South Area',
         certifications: ['Licensed']
       },
       {
         id: 'provider-6',
+        user_id: 'provider-6',
         business_name: 'Premium Home Care',
         rating: 4.9,
         total_reviews: 312,
-        user_id: 'provider-6',
         verification_status: 'approved',
-        description: 'Top-rated service provider with premium materials and exceptional craftsmanship.',
+        description: 'Top-rated service provider with premium materials.',
         years_experience: 15,
-        portfolio_images: [],
-        price: Math.round(maxPrice * 0.95), // 95% of max price
+        price: Math.round(maxPrice * 0.95),
         availability: 'Available today',
         location: 'Central District',
         certifications: ['Licensed', 'Insured', 'Bonded', 'Premium Certified']
@@ -122,15 +116,22 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
     ];
   };
 
-  const mockProviders = generateDummyProviders(selectedService);
+  const providers = generateProviders(selectedService);
 
   const handleSelectProvider = (provider: any) => {
+    console.log('Provider selected:', provider);
     setSelectedProvider(provider);
   };
 
   const handleBookingComplete = () => {
+    console.log('Booking completed successfully');
     setSelectedProvider(null);
     onBookService(selectedProvider);
+  };
+
+  const handleBookingClose = () => {
+    console.log('Booking flow closed');
+    setSelectedProvider(null);
   };
 
   // Show booking flow if provider is selected
@@ -139,7 +140,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
       <BookingFlow
         service={selectedService}
         provider={selectedProvider}
-        onClose={() => setSelectedProvider(null)}
+        onClose={handleBookingClose}
         onComplete={handleBookingComplete}
       />
     );
@@ -155,7 +156,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
         </Button>
         <div>
           <h2 className="text-2xl font-bold text-foreground">{selectedService.title}</h2>
-          <p className="text-muted-foreground">Choose from available providers</p>
+          <p className="text-muted-foreground">Choose from {providers.length} available providers</p>
         </div>
       </div>
 
@@ -181,7 +182,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
             </div>
             <div className="flex items-center gap-1">
               <span className="text-lg font-semibold text-teal">
-                Starting from ${Math.min(...mockProviders.map(p => p.price))}
+                Starting from ${Math.min(...providers.map(p => p.price))}
               </span>
               <span className="text-muted-foreground">
                 {selectedService.price_type === 'hourly' ? '/hr' : ''}
@@ -193,15 +194,15 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
 
       {/* Providers List */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Available Providers ({mockProviders.length})</h3>
+        <h3 className="text-lg font-semibold">Available Providers ({providers.length})</h3>
         
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="grid gap-4"
         >
-          {mockProviders.map((provider, index) => (
-            <Card key={provider.id || index} className="hover:shadow-lg transition-shadow">
+          {providers.map((provider) => (
+            <Card key={provider.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">

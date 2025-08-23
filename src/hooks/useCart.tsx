@@ -23,7 +23,9 @@ export const useCart = () => {
     const savedCart = localStorage.getItem('servicenexus_cart');
     if (savedCart) {
       try {
-        setCartItems(JSON.parse(savedCart));
+        const parsed = JSON.parse(savedCart);
+        console.log('Loading cart from localStorage:', parsed);
+        setCartItems(parsed);
       } catch (error) {
         console.error('Error loading cart from localStorage:', error);
         localStorage.removeItem('servicenexus_cart');
@@ -33,16 +35,22 @@ export const useCart = () => {
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('servicenexus_cart', JSON.stringify(cartItems));
+    if (cartItems.length > 0) {
+      console.log('Saving cart to localStorage:', cartItems);
+      localStorage.setItem('servicenexus_cart', JSON.stringify(cartItems));
+    }
   }, [cartItems]);
 
   const addToCart = (item: Omit<CartItem, 'id'>) => {
+    console.log('addToCart called with:', item);
+    
     // Check if service already exists with same provider (no duplicates allowed)
     const existingItem = cartItems.find(
       cartItem => cartItem.service_id === item.service_id && cartItem.provider_id === item.provider_id
     );
 
     if (existingItem) {
+      console.log('Item already exists in cart');
       toast({
         title: "Already in cart",
         description: "This service from this provider is already in your cart",
@@ -54,6 +62,7 @@ export const useCart = () => {
     // Check if service already exists with different provider (only one provider per service)
     const serviceExists = cartItems.find(cartItem => cartItem.service_id === item.service_id);
     if (serviceExists) {
+      console.log('Service already exists with different provider');
       toast({
         title: "Service already selected",
         description: "You can only select one provider per service type. Remove the existing one first.",
@@ -67,7 +76,13 @@ export const useCart = () => {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
     };
 
-    setCartItems(prev => [...prev, newItem]);
+    console.log('Adding new item to cart:', newItem);
+    setCartItems(prev => {
+      const updated = [...prev, newItem];
+      console.log('Updated cart items:', updated);
+      return updated;
+    });
+    
     toast({
       title: "Added to cart",
       description: `${item.service_title} has been added to your cart`,
@@ -76,7 +91,12 @@ export const useCart = () => {
   };
 
   const removeFromCart = (itemId: string) => {
-    setCartItems(prev => prev.filter(item => item.id !== itemId));
+    console.log('Removing item from cart:', itemId);
+    setCartItems(prev => {
+      const updated = prev.filter(item => item.id !== itemId);
+      console.log('Updated cart after removal:', updated);
+      return updated;
+    });
     toast({
       title: "Removed from cart",
       description: "Service has been removed from your cart",
@@ -84,12 +104,14 @@ export const useCart = () => {
   };
 
   const updateCartItem = (itemId: string, updates: Partial<CartItem>) => {
+    console.log('Updating cart item:', itemId, updates);
     setCartItems(prev => prev.map(item => 
       item.id === itemId ? { ...item, ...updates } : item
     ));
   };
 
   const clearCart = () => {
+    console.log('Clearing cart');
     setCartItems([]);
     localStorage.removeItem('servicenexus_cart');
     toast({
@@ -99,12 +121,18 @@ export const useCart = () => {
   };
 
   const getTotalPrice = () => {
-    return cartItems.reduce((total, item) => total + item.price, 0);
+    const total = cartItems.reduce((total, item) => total + item.price, 0);
+    console.log('Total price calculated:', total);
+    return total;
   };
 
   const getItemCount = () => {
-    return cartItems.length;
+    const count = cartItems.length;
+    console.log('Item count:', count);
+    return count;
   };
+
+  console.log('useCart hook state:', { cartItems: cartItems.length, itemCount: getItemCount() });
 
   return {
     cartItems,

@@ -4,14 +4,13 @@ import { motion } from 'framer-motion';
 import { X, Calendar, Clock, User, Star, DollarSign, CalendarIcon, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, isBefore, isToday, startOfDay } from 'date-fns';
+import { format, addDays, isBefore, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface BookingFlowProps {
@@ -36,6 +35,8 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
   const { addToCart } = useCart();
   const { toast } = useToast();
 
+  console.log('BookingFlow rendered with:', { service: service?.title, provider: provider?.business_name });
+
   // Generate available time slots
   const timeSlots = [
     '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'
@@ -45,8 +46,6 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
   const bookedSlots = [
     { provider_id: provider.id, date: format(new Date(), 'yyyy-MM-dd'), time: '10:00' },
     { provider_id: provider.id, date: format(addDays(new Date(), 1), 'yyyy-MM-dd'), time: '14:00' },
-    { provider_id: 'provider-2', date: format(new Date(), 'yyyy-MM-dd'), time: '11:00' },
-    { provider_id: 'provider-3', date: format(addDays(new Date(), 2), 'yyyy-MM-dd'), time: '15:00' }
   ];
 
   const checkTimeSlotAvailability = (date: Date, time: string) => {
@@ -62,6 +61,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     setSelectedDate(date);
     setSelectedTimeSlot('');
     setConflictError('');
+    console.log('Date selected:', date);
   };
 
   const handleTimeSlotSelect = (time: string) => {
@@ -75,9 +75,12 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     
     setSelectedTimeSlot(time);
     setConflictError('');
+    console.log('Time slot selected:', time);
   };
 
   const handleConfirmBooking = async () => {
+    console.log('Confirm booking clicked');
+    
     if (!selectedDate || !selectedTimeSlot) {
       toast({
         title: 'Date & Time Required',
@@ -98,6 +101,17 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     try {
       const scheduledDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot}:00`;
       
+      console.log('Adding to cart:', {
+        service_id: service.id,
+        provider_id: provider.user_id || provider.id,
+        service_title: service.title,
+        provider_name: provider.business_name,
+        price: provider.price,
+        duration_minutes: service.duration_minutes,
+        scheduled_date: scheduledDateTime,
+        special_instructions: specialInstructions
+      });
+
       const success = addToCart({
         service_id: service.id,
         provider_id: provider.user_id || provider.id,
@@ -109,14 +123,17 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
         special_instructions: specialInstructions
       });
 
+      console.log('Add to cart result:', success);
+
       if (success) {
         toast({
-          title: 'Added to Cart',
+          title: 'Added to Cart!',
           description: `${service.title} with ${provider.business_name} scheduled for ${format(selectedDate, 'PPP')} at ${selectedTimeSlot} has been added to your cart.`
         });
         onComplete();
       }
     } catch (error) {
+      console.error('Error adding to cart:', error);
       toast({
         title: 'Error',
         description: 'Failed to add booking to cart. Please try again.',
