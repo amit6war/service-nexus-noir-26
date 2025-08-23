@@ -1,33 +1,51 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, Star, MapPin, Clock, Plus, ShoppingCart } from 'lucide-react';
+import { Search, Filter, Star, MapPin, Clock, Plus, ShoppingCart, Eye, SlidersHorizontal } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useServices, Service } from '@/hooks/useServices';
 import { useCart } from '@/hooks/useCart';
+import { useNavigate } from 'react-router-dom';
 
 const ServiceBrowser = () => {
   const { services, loading } = useServices();
   const { addToCart } = useCart();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [priceRange, setPriceRange] = useState([0, 500]);
+  const [minRating, setMinRating] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
+  const [emergencyOnly, setEmergencyOnly] = useState(false);
+  const [featuredOnly, setFeaturedOnly] = useState(false);
 
   const filteredServices = services.filter(service => {
     const matchesSearch = service.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         service.description?.toLowerCase().includes(searchTerm.toLowerCase());
+                         service.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         service.provider_profile?.business_name.toLowerCase().includes(searchTerm.toLowerCase());
+    
     const matchesCategory = !selectedCategory || service.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesPrice = service.base_price >= priceRange[0] && service.base_price <= priceRange[1];
+    const matchesRating = !service.provider_profile || service.provider_profile.rating >= minRating;
+    const matchesEmergency = !emergencyOnly || service.emergency_available;
+    const matchesFeatured = !featuredOnly || service.is_featured;
+    
+    return matchesSearch && matchesCategory && matchesPrice && matchesRating && matchesEmergency && matchesFeatured;
   });
 
   const categories = [...new Set(services.map(service => service.category))];
 
   const handleAddToCart = (service: Service) => {
-    if (!service.provider_profile) return;
+    if (!service.provider_profile) {
+      return;
+    }
 
-    addToCart({
+    const success = addToCart({
       service_id: service.id,
       provider_id: service.provider_id!,
       service_title: service.title,
@@ -35,6 +53,23 @@ const ServiceBrowser = () => {
       price: service.base_price,
       duration_minutes: service.duration_minutes
     });
+
+    if (success) {
+      console.log('Service added to cart successfully');
+    }
+  };
+
+  const handleViewProvider = (providerId: string) => {
+    navigate(`/provider-profile/${providerId}`);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('');
+    setPriceRange([0, 500]);
+    setMinRating(0);
+    setEmergencyOnly(false);
+    setFeaturedOnly(false);
   };
 
   if (loading) {
@@ -58,27 +93,111 @@ const ServiceBrowser = () => {
         </Badge>
       </div>
 
-      {/* Search and Filter */}
-      <div className="flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            placeholder="Search services..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      {/* Search and Filter Controls */}
+      <div className="space-y-4">
+        <div className="flex gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              placeholder="Search services, providers..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-4 py-2 border border-border rounded-lg bg-background text-foreground min-w-[150px]"
+          >
+            <option value="">All Categories</option>
+            {categories.map(category => (
+              <option key={category} value={category}>{category}</option>
+            ))}
+          </select>
+
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            Filters
+          </Button>
         </div>
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          className="px-4 py-2 border border-border rounded-lg bg-background text-foreground"
-        >
-          <option value="">All Categories</option>
-          {categories.map(category => (
-            <option key={category} value={category}>{category}</option>
-          ))}
-        </select>
+
+        {/* Advanced Filters */}
+        {showFilters && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Filter Options</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Price Range */}
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">
+                    Price Range: ${priceRange[0]} - ${priceRange[1]}
+                  </label>
+                  <Slider
+                    value={priceRange}
+                    onValueChange={setPriceRange}
+                    max={500}
+                    min={0}
+                    step={10}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Minimum Rating */}
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">
+                    Minimum Rating: {minRating} stars
+                  </label>
+                  <Slider
+                    value={[minRating]}
+                    onValueChange={(value) => setMinRating(value[0])}
+                    max={5}
+                    min={0}
+                    step={0.5}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Emergency Services */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="emergency"
+                    checked={emergencyOnly}
+                    onCheckedChange={setEmergencyOnly}
+                  />
+                  <label htmlFor="emergency" className="text-sm font-medium text-foreground">
+                    Emergency Services Only
+                  </label>
+                </div>
+
+                {/* Featured Services */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="featured"
+                    checked={featuredOnly}
+                    onCheckedChange={setFeaturedOnly}
+                  />
+                  <label htmlFor="featured" className="text-sm font-medium text-foreground">
+                    Featured Services Only
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={clearFilters} variant="outline" size="sm">
+                  Clear Filters
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Services Grid */}
@@ -92,6 +211,17 @@ const ServiceBrowser = () => {
             transition={{ duration: 0.2 }}
           >
             <Card className="h-full hover:shadow-lg transition-shadow">
+              {/* Service Image */}
+              {service.images && service.images.length > 0 && (
+                <div className="h-48 overflow-hidden rounded-t-lg">
+                  <img
+                    src={service.images[0]}
+                    alt={service.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+              
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
@@ -100,9 +230,16 @@ const ServiceBrowser = () => {
                       {service.provider_profile?.business_name}
                     </CardDescription>
                   </div>
-                  {service.is_featured && (
-                    <Badge className="bg-yellow-500 text-white">Featured</Badge>
-                  )}
+                  <div className="flex flex-col gap-1">
+                    {service.is_featured && (
+                      <Badge className="bg-yellow-500 text-white text-xs">Featured</Badge>
+                    )}
+                    {service.emergency_available && (
+                      <Badge variant="outline" className="text-red-500 border-red-500 text-xs">
+                        Emergency
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               
@@ -136,22 +273,28 @@ const ServiceBrowser = () => {
                         {service.price_type === 'hourly' ? '/hr' : ''}
                       </span>
                     </div>
+                  </div>
+                  
+                  <div className="flex gap-2 mt-4">
+                    <Button
+                      onClick={() => handleViewProvider(service.provider_id!)}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      View Provider
+                    </Button>
                     
                     <Button
                       onClick={() => handleAddToCart(service)}
-                      className="bg-teal hover:bg-teal/90"
+                      className="bg-teal hover:bg-teal/90 flex-1"
                       size="sm"
                     >
                       <Plus className="w-4 h-4 mr-1" />
                       Add to Cart
                     </Button>
                   </div>
-                  
-                  {service.emergency_available && (
-                    <Badge variant="outline" className="text-red-500 border-red-500">
-                      Emergency Available
-                    </Badge>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -162,6 +305,9 @@ const ServiceBrowser = () => {
       {filteredServices.length === 0 && (
         <div className="text-center py-12">
           <p className="text-muted-foreground">No services found matching your criteria.</p>
+          <Button onClick={clearFilters} className="mt-4" variant="outline">
+            Clear Filters
+          </Button>
         </div>
       )}
     </div>

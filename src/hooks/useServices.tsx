@@ -23,6 +23,9 @@ export interface Service {
     total_reviews: number;
     user_id: string;
     verification_status: string;
+    description?: string;
+    years_experience?: number;
+    portfolio_images?: string[];
   };
 }
 
@@ -34,7 +37,9 @@ export const useServices = () => {
   const fetchServices = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // First fetch all active services
+      const { data: servicesData, error: servicesError } = await supabase
         .from('services')
         .select(`
           id,
@@ -53,71 +58,84 @@ export const useServices = () => {
         `)
         .eq('is_active', true);
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+      if (servicesError) {
+        console.error('Error fetching services:', servicesError);
+        throw servicesError;
       }
 
-      // Fetch provider profiles separately for active services
-      const providerIds = data?.map(service => service.provider_id).filter(Boolean) || [];
-      
-      let providerProfiles: any[] = [];
-      if (providerIds.length > 0) {
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('provider_profiles')
-          .select(`
-            user_id,
-            business_name,
-            rating,
-            total_reviews,
-            verification_status
-          `)
-          .in('user_id', providerIds)
-          .eq('verification_status', 'approved');
-
-        if (profilesError) {
-          console.error('Error fetching provider profiles:', profilesError);
-        } else {
-          providerProfiles = profilesData || [];
-        }
+      if (!servicesData || servicesData.length === 0) {
+        setServices([]);
+        return;
       }
 
-      // Transform the data to match our Service interface
-      const transformedServices: Service[] = (data || []).map(service => {
-        const providerProfile = providerProfiles.find(
-          profile => profile.user_id === service.provider_id
-        );
-
-        return {
-          id: service.id,
-          title: service.title,
-          description: service.description || '',
-          category: service.category,
-          subcategory: service.subcategory,
-          base_price: service.base_price || 0,
-          duration_minutes: service.duration_minutes || 0,
-          price_type: service.price_type || 'fixed',
-          images: service.images || [],
-          is_active: service.is_active,
-          is_featured: service.is_featured || false,
-          emergency_available: service.emergency_available || false,
-          provider_id: service.provider_id,
-          provider_profile: providerProfile ? {
-            business_name: providerProfile.business_name || '',
-            rating: providerProfile.rating || 0,
-            total_reviews: providerProfile.total_reviews || 0,
-            user_id: providerProfile.user_id,
-            verification_status: providerProfile.verification_status
-          } : undefined
-        };
-      }).filter(service => service.provider_profile); // Only include services with approved providers
+      // Get unique provider IDs
+      const providerIds = [...new Set(servicesData.map(service => service.provider_id).filter(Boolean))];
       
+      // Fetch provider profiles for these services
+      const { data: providersData, error: providersError } = await supabase
+        .from('provider_profiles')
+        .select(`
+          user_id,
+          business_name,
+          rating,
+          total_reviews,
+          verification_status,
+          description,
+          years_experience,
+          portfolio_images
+        `)
+        .in('user_id', providerIds)
+        .eq('verification_status', 'approved');
+
+      if (providersError) {
+        console.error('Error fetching providers:', providersError);
+        // Continue without provider data rather than failing completely
+      }
+
+      // Transform and combine the data
+      const transformedServices: Service[] = servicesData
+        .map(service => {
+          const provider = providersData?.find(p => p.user_id === service.provider_id);
+          
+          if (!provider) {
+            return null; // Skip services without approved providers
+          }
+
+          return {
+            id: service.id,
+            title: service.title,
+            description: service.description || '',
+            category: service.category,
+            subcategory: service.subcategory,
+            base_price: service.base_price || 0,
+            duration_minutes: service.duration_minutes || 30,
+            price_type: service.price_type || 'fixed',
+            images: service.images || [],
+            is_active: service.is_active,
+            is_featured: service.is_featured || false,
+            emergency_available: service.emergency_available || false,
+            provider_id: service.provider_id,
+            provider_profile: {
+              business_name: provider.business_name || 'Unknown Provider',
+              rating: provider.rating || 0,
+              total_reviews: provider.total_reviews || 0,
+              user_id: provider.user_id,
+              verification_status: provider.verification_status,
+              description: provider.description,
+              years_experience: provider.years_experience,
+              portfolio_images: provider.portfolio_images || []
+            }
+          };
+        })
+        .filter((service): service is Service => service !== null);
+      
+      console.log('Fetched services:', transformedServices);
       setServices(transformedServices);
     } catch (error) {
-      console.error('Error fetching services:', error);
+      console.error('Error in fetchServices:', error);
       toast({
         title: "Error",
-        description: "Failed to load services",
+        description: "Failed to load services. Please try again.",
         variant: "destructive"
       });
       setServices([]);

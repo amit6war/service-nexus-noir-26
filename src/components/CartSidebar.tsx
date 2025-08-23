@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/hooks/useCart';
+import { useNavigate } from 'react-router-dom';
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -14,10 +15,11 @@ interface CartSidebarProps {
 
 const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose }) => {
   const { cartItems, removeFromCart, getTotalPrice, clearCart } = useCart();
+  const navigate = useNavigate();
 
   const handleCheckout = () => {
-    // TODO: Implement booking creation and payment processing
-    console.log('Proceeding to checkout with items:', cartItems);
+    onClose();
+    navigate('/checkout');
   };
 
   return (
