@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCart, CreditCard, MapPin, Calendar, Clock, User, CheckCircle } from 'lucide-react';
+import { ShoppingCart, CreditCard, MapPin, Calendar, Clock, User, CheckCircle, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { useBookingsActions } from '@/hooks/useBookingsActions';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import AddressManager, { Address } from '@/components/AddressManager';
 
 const Checkout = () => {
   const { items, getTotalPrice, clearCart } = useShoppingCart();
@@ -21,15 +22,11 @@ const Checkout = () => {
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('card');
-  const [address, setAddress] = useState({
-    address_line_1: '',
-    address_line_2: '',
-    city: '',
-    state: '',
-    zip_code: '',
-    country: 'US'
-  });
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+
+  const handleAddressSelect = (address: Address) => {
+    setSelectedAddress(address);
+  };
 
   const handlePayment = async () => {
     if (items.length === 0) {
@@ -41,10 +38,10 @@ const Checkout = () => {
       return;
     }
 
-    if (!address.address_line_1 || !address.city || !address.state || !address.zip_code) {
+    if (!selectedAddress) {
       toast({
         title: 'Address Required',
-        description: 'Please fill in all required address fields.',
+        description: 'Please select a service address.',
         variant: 'destructive'
       });
       return;
@@ -64,11 +61,22 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      // Simulate payment processing
+      // TODO: Integrate with Stripe payment processing
+      // For now, simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 2000));
 
+      // Convert selected address to the format expected by createBookingsFromCart
+      const addressForBooking = {
+        address_line_1: selectedAddress.address_line_1,
+        address_line_2: selectedAddress.address_line_2 || '',
+        city: selectedAddress.city,
+        state: selectedAddress.state,
+        zip_code: selectedAddress.postal_code,
+        country: selectedAddress.country
+      };
+
       // Create bookings from cart items
-      const success = await createBookingsFromCart(items, address);
+      const success = await createBookingsFromCart(items, addressForBooking);
 
       if (success) {
         // Clear cart after successful booking creation
@@ -119,7 +127,18 @@ const Checkout = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+          {/* Header with Back Button */}
+          <div className="flex items-center gap-4 mb-8">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/customer-dashboard')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
+            </Button>
+            <h1 className="text-3xl font-bold">Checkout</h1>
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Order Summary */}
@@ -174,71 +193,22 @@ const Checkout = () => {
               </Card>
             </div>
 
-            {/* Payment & Address Form */}
+            {/* Service Address & Payment Form */}
             <div className="space-y-6">
-              {/* Service Address */}
+              {/* Service Address Selection */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <MapPin className="w-5 h-5" />
-                    Service Address
+                    Select Service Address
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="address1">Address Line 1 *</Label>
-                    <Input
-                      id="address1"
-                      value={address.address_line_1}
-                      onChange={(e) => setAddress(prev => ({ ...prev, address_line_1: e.target.value }))}
-                      placeholder="Street address"
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="address2">Address Line 2</Label>
-                    <Input
-                      id="address2"
-                      value={address.address_line_2}
-                      onChange={(e) => setAddress(prev => ({ ...prev, address_line_2: e.target.value }))}
-                      placeholder="Apartment, suite, etc."
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="city">City *</Label>
-                      <Input
-                        id="city"
-                        value={address.city}
-                        onChange={(e) => setAddress(prev => ({ ...prev, city: e.target.value }))}
-                        placeholder="City"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="state">State *</Label>
-                      <Input
-                        id="state"
-                        value={address.state}
-                        onChange={(e) => setAddress(prev => ({ ...prev, state: e.target.value }))}
-                        placeholder="State"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="zip">ZIP Code *</Label>
-                    <Input
-                      id="zip"
-                      value={address.zip_code}
-                      onChange={(e) => setAddress(prev => ({ ...prev, zip_code: e.target.value }))}
-                      placeholder="ZIP Code"
-                      required
-                    />
-                  </div>
+                <CardContent>
+                  <AddressManager
+                    onAddressSelect={handleAddressSelect}
+                    selectedAddressId={selectedAddress?.id}
+                    showSelection={true}
+                  />
                 </CardContent>
               </Card>
 
@@ -279,6 +249,12 @@ const Checkout = () => {
                         />
                       </div>
                     </div>
+
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        <strong>Test Mode:</strong> Use test card number 4242 4242 4242 4242 with any future expiry date and any 3-digit CVV.
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -286,7 +262,7 @@ const Checkout = () => {
               {/* Payment Button */}
               <Button
                 onClick={handlePayment}
-                disabled={loading}
+                disabled={loading || !selectedAddress}
                 className="w-full h-14 text-lg bg-teal hover:bg-teal/90"
                 size="lg"
               >
@@ -306,6 +282,12 @@ const Checkout = () => {
                   </div>
                 )}
               </Button>
+              
+              {!selectedAddress && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Please select a service address to continue
+                </p>
+              )}
             </div>
           </div>
         </div>
