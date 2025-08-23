@@ -2,6 +2,7 @@
 import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 
 type UUID = string;
 
@@ -48,6 +49,8 @@ function formatServiceAddress(addr: Address) {
   return `${addr.address_line_1}${line2}${city}${state}${zip}${country}`.trim();
 }
 
+type BookingInsert = Database['public']['Tables']['bookings']['Insert'];
+
 export const useBookingsActions = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -66,15 +69,14 @@ export const useBookingsActions = () => {
       const customerId = userData.user.id;
       const service_address = formatServiceAddress(address);
 
-      // Build booking rows
-      const rows = items.map((item) => ({
+      // Build typed booking rows (omit status to use DB default 'pending')
+      const rows: BookingInsert[] = items.map((item) => ({
         customer_id: customerId,
         provider_user_id: item.provider_id,
         service_id: item.service_id,
-        status: 'pending',
         service_date: item.scheduled_date,
         duration_minutes: item.duration_minutes ?? null,
-        final_price: item.price,
+        final_price: item.price, // numeric type in generated types accepts number
         estimated_price: item.price,
         special_instructions: item.special_instructions || null,
         booking_number: generateBookingNumber(),
@@ -184,4 +186,3 @@ export const useBookingsActions = () => {
     cancelBooking,
   };
 };
-
