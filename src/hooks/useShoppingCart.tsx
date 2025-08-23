@@ -75,7 +75,7 @@ export const useShoppingCart = () => {
         description: "This service from this provider is already in your cart",
         variant: "destructive"
       });
-      return Promise.resolve(false);
+      return false;
     }
 
     // Check if service already exists with different provider
@@ -87,7 +87,7 @@ export const useShoppingCart = () => {
         description: "You can only select one provider per service type. Remove the existing one first.",
         variant: "destructive"
       });
-      return Promise.resolve(false);
+      return false;
     }
 
     // Create new item with unique ID
@@ -98,10 +98,11 @@ export const useShoppingCart = () => {
 
     console.log('🛒 Creating new cart item:', newItem);
 
-    // Update state directly
+    // Update state with new item
     setItems(currentItems => {
       const newItems = [...currentItems, newItem];
-      console.log('✅ New cart state updated:', newItems.length, 'items');
+      console.log('✅ Cart state updated - new count:', newItems.length);
+      console.log('✅ New cart items:', newItems.map(i => i.service_title));
       return newItems;
     });
 
@@ -112,7 +113,7 @@ export const useShoppingCart = () => {
     });
 
     console.log('✅ ADD ITEM COMPLETED SUCCESSFULLY');
-    return Promise.resolve(true);
+    return true;
   }, [items, toast]);
 
   const removeItem = useCallback((itemId: string) => {
@@ -122,6 +123,7 @@ export const useShoppingCart = () => {
       const itemToRemove = prevItems.find(item => item.id === itemId);
       const newItems = prevItems.filter(item => item.id !== itemId);
       console.log('✅ Item removed - remaining items:', newItems.length);
+      console.log('✅ Remaining items:', newItems.map(i => i.service_title));
       
       if (itemToRemove) {
         toast({
@@ -158,9 +160,15 @@ export const useShoppingCart = () => {
     return total;
   }, [items]);
 
+  // Calculate item count directly from items array
   const itemCount = items.length;
 
-  console.log('🛒 Hook returning state:', { itemCount, initialized, itemTitles: items.map(i => i.service_title) });
+  console.log('🛒 Hook returning state:', { 
+    itemCount, 
+    initialized, 
+    itemTitles: items.map(i => i.service_title),
+    actualItemsCount: items.length 
+  });
 
   return {
     items,

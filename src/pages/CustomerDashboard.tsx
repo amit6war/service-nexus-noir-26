@@ -20,7 +20,9 @@ const CustomerDashboard = () => {
   
   const { user, signOut } = useAuth();
   const { services, loading, error } = useServices();
-  const { itemCount } = useShoppingCart();
+  const { itemCount, initialized } = useShoppingCart();
+
+  console.log('🏠 CustomerDashboard render - cart itemCount:', itemCount, 'initialized:', initialized);
 
   const handleServiceSelect = (service) => {
     setSelectedService(service);
@@ -126,8 +128,10 @@ const CustomerDashboard = () => {
           >
             <ShoppingCart className="w-5 h-5" />
             Cart
-            {itemCount > 0 && (
-              <Badge className="ml-auto bg-teal text-white">{itemCount}</Badge>
+            {initialized && itemCount > 0 && (
+              <Badge className="ml-auto bg-teal text-white min-w-[24px] h-6 flex items-center justify-center rounded-full">
+                {itemCount}
+              </Badge>
             )}
           </button>
           
