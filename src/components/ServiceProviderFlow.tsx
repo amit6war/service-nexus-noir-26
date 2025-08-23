@@ -23,41 +23,100 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
 
   if (!selectedService) return null;
 
-  // Mock multiple providers for demonstration - in real app this would come from backend
-  const mockProviders = [
-    {
-      ...selectedService.provider_profile,
-      id: selectedService.provider_id,
-      price: selectedService.base_price,
-      availability: 'Available today'
-    },
-    {
-      id: 'provider-2',
-      business_name: 'Premium Home Services',
-      rating: 4.8,
-      total_reviews: 156,
-      user_id: 'provider-2',
-      verification_status: 'approved',
-      description: 'Professional and reliable service provider',
-      years_experience: 8,
-      portfolio_images: [],
-      price: selectedService.base_price * 1.2,
-      availability: 'Available tomorrow'
-    },
-    {
-      id: 'provider-3', 
-      business_name: 'Expert Care Solutions',
-      rating: 4.6,
-      total_reviews: 89,
-      user_id: 'provider-3',
-      verification_status: 'approved',
-      description: 'Specialized in quality service delivery',
-      years_experience: 5,
-      portfolio_images: [],
-      price: selectedService.base_price * 0.9,
-      availability: 'Available this week'
-    }
-  ].filter(Boolean);
+  // Generate dummy providers for each service with varied pricing
+  const generateDummyProviders = (service: Service) => {
+    const basePrice = service.base_price || 100;
+    const maxPrice = basePrice * 1.5; // Admin set maximum (50% above base)
+    
+    return [
+      {
+        id: 'provider-1',
+        business_name: 'Elite Professional Services',
+        rating: 4.9,
+        total_reviews: 247,
+        user_id: 'provider-1',
+        verification_status: 'approved',
+        description: 'Premium quality service with 10+ years experience',
+        years_experience: 12,
+        portfolio_images: [],
+        price: Math.round(maxPrice * 0.95), // 95% of max price
+        availability: 'Available today',
+        location: 'Downtown Area'
+      },
+      {
+        id: 'provider-2',
+        business_name: 'Reliable Home Solutions',
+        rating: 4.7,
+        total_reviews: 189,
+        user_id: 'provider-2',
+        verification_status: 'approved',
+        description: 'Fast and efficient service delivery',
+        years_experience: 8,
+        portfolio_images: [],
+        price: Math.round(maxPrice * 0.80), // 80% of max price
+        availability: 'Available tomorrow',
+        location: 'North Side'
+      },
+      {
+        id: 'provider-3',
+        business_name: 'Expert Care Team',
+        rating: 4.6,
+        total_reviews: 156,
+        user_id: 'provider-3',
+        verification_status: 'approved',
+        description: 'Specialized in quality service delivery',
+        years_experience: 6,
+        portfolio_images: [],
+        price: Math.round(maxPrice * 0.70), // 70% of max price
+        availability: 'Available this week',
+        location: 'East District'
+      },
+      {
+        id: 'provider-4',
+        business_name: 'Quick Fix Professionals',
+        rating: 4.8,
+        total_reviews: 203,
+        user_id: 'provider-4',
+        verification_status: 'approved',
+        description: 'Same-day service available',
+        years_experience: 9,
+        portfolio_images: [],
+        price: Math.round(maxPrice * 0.85), // 85% of max price
+        availability: 'Available now',
+        location: 'West Side'
+      },
+      {
+        id: 'provider-5',
+        business_name: 'Budget Friendly Services',
+        rating: 4.4,
+        total_reviews: 128,
+        user_id: 'provider-5',
+        verification_status: 'approved',
+        description: 'Affordable rates without compromising quality',
+        years_experience: 5,
+        portfolio_images: [],
+        price: Math.round(maxPrice * 0.60), // 60% of max price
+        availability: 'Available next week',
+        location: 'South Area'
+      },
+      {
+        id: 'provider-6',
+        business_name: 'Premium Home Care',
+        rating: 4.9,
+        total_reviews: 312,
+        user_id: 'provider-6',
+        verification_status: 'approved',
+        description: 'Top-rated service provider in the area',
+        years_experience: 15,
+        portfolio_images: [],
+        price: Math.round(maxPrice), // Full max price
+        availability: 'Available today',
+        location: 'Central District'
+      }
+    ];
+  };
+
+  const mockProviders = generateDummyProviders(selectedService);
 
   const handleSelectProvider = (provider: any) => {
     setSelectedProvider(provider);
@@ -140,37 +199,32 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    {provider.portfolio_images?.[0] ? (
-                      <img
-                        src={provider.portfolio_images[0]}
-                        alt={provider.business_name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-teal/20 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-teal" />
-                      </div>
-                    )}
+                    <div className="w-12 h-12 bg-teal/20 rounded-full flex items-center justify-center">
+                      <User className="w-6 h-6 text-teal" />
+                    </div>
                     <div>
                       <CardTitle className="text-lg">
                         {provider.business_name}
                       </CardTitle>
                       <CardDescription>
-                        {provider.description || 'Professional service provider'}
+                        {provider.description}
                       </CardDescription>
+                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                        <span>📍 {provider.location}</span>
+                      </div>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center gap-1 mb-1">
                       <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="font-medium">{provider.rating || 0}</span>
+                      <span className="font-medium">{provider.rating}</span>
                       <span className="text-muted-foreground text-sm">
-                        ({provider.total_reviews || 0})
+                        ({provider.total_reviews})
                       </span>
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Award className="w-3 h-3" />
-                      <span>{provider.years_experience || 0} years exp</span>
+                      <span>{provider.years_experience} years exp</span>
                     </div>
                   </div>
                 </div>

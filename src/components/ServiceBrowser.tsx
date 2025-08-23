@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, Star, MapPin, Clock, Plus, ShoppingCart, Eye, SlidersHorizontal, Award, Users } from 'lucide-react';
@@ -42,29 +43,6 @@ const ServiceBrowser = () => {
   });
 
   const categories = [...new Set(services.map(service => service.category))];
-
-  const handleAddToCart = (service: Service) => {
-    if (!service.provider_profile) {
-      return;
-    }
-
-    const success = addToCart({
-      service_id: service.id,
-      provider_id: service.provider_id!,
-      service_title: service.title,
-      provider_name: service.provider_profile.business_name,
-      price: service.base_price,
-      duration_minutes: service.duration_minutes
-    });
-
-    if (success) {
-      console.log('Service added to cart successfully');
-      toast({
-        title: 'Added to cart',
-        description: `${service.title} by ${service.provider_profile.business_name} was added.`,
-      });
-    }
-  };
 
   const handleViewProviders = (service: Service) => {
     setSelectedService(service);
@@ -276,7 +254,7 @@ const ServiceBrowser = () => {
                             className="w-5 h-5 rounded-full object-cover"
                           />
                         )}
-                      {service.provider_profile?.business_name}
+                      Multiple providers available
                     </CardDescription>
                   </div>
                   <div className="flex flex-col gap-1">
@@ -300,39 +278,14 @@ const ServiceBrowser = () => {
                   
                   <div className="flex items-center gap-4 text-sm">
                     <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span>{service.provider_profile?.rating || 0}</span>
-                      <span className="text-muted-foreground">
-                        ({service.provider_profile?.total_reviews || 0})
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1">
                       <Clock className="w-4 h-4 text-muted-foreground" />
                       <span>{service.duration_minutes}min</span>
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <Award className="w-4 h-4 text-muted-foreground" />
-                      <span>{service.provider_profile?.years_experience || 0} yrs</span>
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <span>5+ providers</span>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-lg font-semibold text-teal">
-                        ${service.base_price}
-                      </span>
-                      <span className="text-sm text-muted-foreground ml-1">
-                        {service.price_type === 'hourly' ? '/hr' : ''}
-                      </span>
-                    </div>
-                    {service.provider_profile && (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Users className="w-4 h-4" />
-                        <span>1 provider</span>
-                      </div>
-                    )}
                   </div>
                   
                   <div className="flex gap-2 mt-4">
@@ -343,16 +296,6 @@ const ServiceBrowser = () => {
                     >
                       <Users className="w-4 h-4 mr-1" />
                       View Providers
-                    </Button>
-                    
-                    <Button
-                      onClick={() => handleAddToCart(service)}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add to Cart
                     </Button>
                   </div>
                 </div>
