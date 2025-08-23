@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, Star, MapPin, Clock, Plus, ShoppingCart, Eye, SlidersHorizontal, Award, Users } from 'lucide-react';
@@ -71,12 +70,12 @@ const ServiceBrowser = () => {
     setSelectedService(service);
   };
 
-  const handleBookService = (providerId: string, service: Service) => {
+  const handleBookService = (provider: any) => {
     // Navigate to checkout or booking page
     navigate('/checkout');
     toast({
       title: 'Booking initiated',
-      description: `Booking ${service.title} with ${service.provider_profile?.business_name}`,
+      description: `Booking ${selectedService?.title} with ${provider?.business_name}`,
     });
   };
 
