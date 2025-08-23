@@ -11,7 +11,7 @@ import ConfirmationPage from '@/components/auth/ConfirmationPage';
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, signIn, loading } = useAuth();
+  const { user, signIn, loading, profileRole } = useAuth(); // UPDATED: use profileRole from context
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const [isLogin, setIsLogin] = useState(true);
@@ -65,22 +65,23 @@ const Auth = () => {
   }, [searchParams, toast]);
 
   // Redirect if user is already logged in
-  // Update the useEffect that handles user redirection
   useEffect(() => {
     if (user && confirmationState !== 'success') {
-      // Check user role and redirect accordingly
-      const userRole = user.user_metadata?.role || 'customer';
-      console.log('User role detected:', userRole); // Debug log
-      
-      if (userRole === 'customer') {
-        navigate('/dashboard');
-      } else if (userRole === 'provider' || userRole === 'pending_provider') {
+      // Use role from profiles table for accurate routing
+      const role = profileRole || 'customer';
+      console.log('Routing by profile role:', role);
+
+      if (role === 'customer') {
+        navigate('/customer-dashboard'); // FIXED: correct path
+      } else if (role === 'provider') {
         navigate('/provider-dashboard');
+      } else if (role === 'admin') {
+        navigate('/admin-dashboard');
       } else {
         navigate('/');
       }
     }
-  }, [user, navigate, confirmationState]);
+  }, [user, navigate, confirmationState, profileRole]);
 
   // Update the handleLoginSubmit function
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -90,7 +91,7 @@ const Auth = () => {
     try {
       const { error } = await signIn(loginData.email, loginData.password);
       if (!error) {
-        // The useEffect will handle the redirection based on user role
+        // Redirection handled by useEffect based on profileRole
       }
     } catch (error) {
       console.error('Login error:', error);

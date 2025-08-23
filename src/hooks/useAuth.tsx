@@ -1,8 +1,11 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
+
+type AppRole = 'customer' | 'provider' | 'admin';
 
 interface AuthContextType {
   user: User | null;
@@ -11,6 +14,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, userData?: any) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
+  profileRole: AppRole | null; // NEW: role from profiles table
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,13 +35,45 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileRole, setProfileRole] = useState<AppRole | null>(null);
+
+  // Helper to load role from profiles
+  const loadProfileRole = async (userId: string | undefined | null) => {
+    if (!userId) {
+      setProfileRole(null);
+      return;
+    }
+    console.log('[Auth] Loading profile role for user:', userId);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[Auth] Failed to fetch profile role:', error.message);
+      return;
+    }
+
+    if (data?.role) {
+      // Normalize to our union type
+      const role = String(data.role) as AppRole;
+      console.log('[Auth] Profile role detected:', role);
+      setProfileRole(role);
+    } else {
+      setProfileRole(null);
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
-        setUser(session?.user ?? null);
+        const nextUser = session?.user ?? null;
+        setUser(nextUser);
+        // Load the role from profiles when auth state changes
+        loadProfileRole(nextUser?.id ?? null);
         setLoading(false);
       }
     );
@@ -45,7 +81,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
+      const nextUser = session?.user ?? null;
+      setUser(nextUser);
+      // Load the role from profiles on initial load
+      loadProfileRole(nextUser?.id ?? null);
       setLoading(false);
     });
 
@@ -92,6 +131,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         description: error.message,
         variant: "destructive",
       });
+    } else {
+      // After successful sign-in, ensure we refresh the profile role
+      await loadProfileRole(supabase.auth.getUser().then(r => r.data.user?.id).catch(() => null) as any);
     }
 
     return { error };
@@ -118,6 +160,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     signUp,
     signIn,
     signOut,
+    profileRole,
   };
 
   return (
