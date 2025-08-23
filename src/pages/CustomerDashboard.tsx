@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Calendar, Heart, ShoppingCart, Star, Clock, MapPin, Bell, LogOut } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,11 @@ const CustomerDashboard = () => {
   const { itemCount, initialized } = useShoppingCart();
 
   console.log('🏠 CustomerDashboard render - cart itemCount:', itemCount, 'initialized:', initialized);
+
+  // Force re-render when cart changes by watching itemCount
+  useEffect(() => {
+    console.log('🏠 CustomerDashboard - cart count changed to:', itemCount);
+  }, [itemCount]);
 
   const handleServiceSelect = (service) => {
     setSelectedService(service);
@@ -129,7 +135,10 @@ const CustomerDashboard = () => {
             <ShoppingCart className="w-5 h-5" />
             Cart
             {initialized && itemCount > 0 && (
-              <Badge className="ml-auto bg-teal text-white min-w-[24px] h-6 flex items-center justify-center rounded-full">
+              <Badge 
+                key={itemCount} // Force re-render when count changes
+                className="ml-auto bg-teal text-white min-w-[24px] h-6 flex items-center justify-center rounded-full"
+              >
                 {itemCount}
               </Badge>
             )}

@@ -165,7 +165,7 @@ export const useShoppingCart = () => {
     return total;
   }, [items]);
 
-  // Calculate item count directly from items array
+  // Calculate item count directly from items array and memoize it
   const itemCount = items.length;
 
   console.log('🛒 Hook returning state:', { 
