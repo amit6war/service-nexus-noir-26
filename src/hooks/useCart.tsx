@@ -33,10 +33,13 @@ export const useCart = () => {
     }
   }, []);
 
-  // Save cart to localStorage whenever it changes
+  // Save cart to localStorage whenever it changes (backup save)
   useEffect(() => {
-    console.log('Cart items changed, saving to localStorage:', cartItems);
-    localStorage.setItem('servicenexus_cart', JSON.stringify(cartItems));
+    console.log('useEffect - Cart items changed:', cartItems);
+    if (cartItems.length >= 0) {
+      localStorage.setItem('servicenexus_cart', JSON.stringify(cartItems));
+      console.log('useEffect - Cart saved to localStorage:', cartItems);
+    }
   }, [cartItems]);
 
   const addToCart = (item: Omit<CartItem, 'id'>) => {
@@ -71,13 +74,22 @@ export const useCart = () => {
 
     const newItem: CartItem = {
       ...item,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+      id: `cart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };
 
     console.log('Adding new item to cart:', newItem);
+    
+    // Use functional update to ensure we get the latest state
     setCartItems(prevItems => {
       const updatedItems = [...prevItems, newItem];
-      console.log('Cart updated with new items:', updatedItems);
+      console.log('Cart state updated - new items array:', updatedItems);
+      // Save to localStorage immediately in the state update
+      try {
+        localStorage.setItem('servicenexus_cart', JSON.stringify(updatedItems));
+        console.log('Cart saved to localStorage:', updatedItems);
+      } catch (error) {
+        console.error('Failed to save cart to localStorage:', error);
+      }
       return updatedItems;
     });
     
