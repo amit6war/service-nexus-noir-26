@@ -9,12 +9,12 @@ import { useServices } from '@/hooks/useServices';
 import { useCart } from '@/hooks/useCart';
 import ServiceProviderFlow from '@/components/ServiceProviderFlow';
 import CartSidebar from '@/components/CartSidebar';
-import BookingFlow from '@/components/BookingFlow';
+import ProfileSettings from '@/components/ProfileSettings';
+import MyBookings from '@/components/MyBookings';
 
 const CustomerDashboard = () => {
   const [activeTab, setActiveTab] = useState('browse');
   const [selectedService, setSelectedService] = useState(null);
-  const [showBookingFlow, setShowBookingFlow] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [showCart, setShowCart] = useState(false);
   
@@ -29,11 +29,9 @@ const CustomerDashboard = () => {
 
   const handleProviderSelect = (provider) => {
     setSelectedProvider(provider);
-    setShowBookingFlow(true);
   };
 
   const handleBookingComplete = () => {
-    setShowBookingFlow(false);
     setSelectedService(null);
     setSelectedProvider(null);
     setActiveTab('browse');
@@ -109,15 +107,15 @@ const CustomerDashboard = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('notifications')}
+            onClick={() => setActiveTab('profile')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
-              activeTab === 'notifications' 
+              activeTab === 'profile' 
                 ? 'bg-teal/10 text-teal border border-teal/20' 
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
             }`}
           >
-            <Bell className="w-5 h-5" />
-            Notifications
+            <User className="w-5 h-5" />
+            Profile Settings
           </button>
         </nav>
 
@@ -265,14 +263,9 @@ const CustomerDashboard = () => {
               />
             )}
 
-            {/* Other Tabs */}
+            {/* My Bookings */}
             {activeTab === 'bookings' && (
-              <div className="space-y-6">
-                <h1 className="text-3xl font-bold text-foreground">My Bookings</h1>
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground">No bookings yet. Browse services to get started!</p>
-                </div>
-              </div>
+              <MyBookings />
             )}
 
             {activeTab === 'favorites' && (
@@ -284,27 +277,12 @@ const CustomerDashboard = () => {
               </div>
             )}
 
-            {activeTab === 'notifications' && (
-              <div className="space-y-6">
-                <h1 className="text-3xl font-bold text-foreground">Notifications</h1>
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground">No notifications at the moment.</p>
-                </div>
-              </div>
+            {activeTab === 'profile' && (
+              <ProfileSettings />
             )}
           </div>
         </div>
       </div>
-
-      {/* Booking Flow Modal */}
-      {showBookingFlow && selectedService && selectedProvider && (
-        <BookingFlow
-          service={selectedService}
-          provider={selectedProvider}
-          onClose={() => setShowBookingFlow(false)}
-          onComplete={handleBookingComplete}
-        />
-      )}
 
       {/* Cart Sidebar */}
       <CartSidebar isOpen={showCart} onClose={() => setShowCart(false)} />
