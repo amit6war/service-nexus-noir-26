@@ -14,14 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      booking_status_history: {
+        Row: {
+          booking_id: string
+          changed_at: string
+          changed_by: string
+          id: string
+          new_status: Database["public"]["Enums"]["booking_status"]
+          notes: string | null
+          old_status: Database["public"]["Enums"]["booking_status"] | null
+        }
+        Insert: {
+          booking_id: string
+          changed_at?: string
+          changed_by: string
+          id?: string
+          new_status: Database["public"]["Enums"]["booking_status"]
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["booking_status"] | null
+        }
+        Update: {
+          booking_id?: string
+          changed_at?: string
+          changed_by?: string
+          id?: string
+          new_status?: Database["public"]["Enums"]["booking_status"]
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["booking_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_status_history_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           accepted_at: string | null
           booking_number: string
+          cancellation_fee: number | null
           cancellation_reason: string | null
           cancelled_at: string | null
           cancelled_by: string | null
           completed_at: string | null
+          confirmed_at: string | null
           coordinates: unknown | null
           created_at: string
           customer_id: string
@@ -35,6 +75,8 @@ export type Database = {
           provider_earnings: number | null
           provider_user_id: string
           recurring_schedule: Json | null
+          refund_amount: number | null
+          refund_processed_at: string | null
           service_address: string
           service_city: string | null
           service_date: string
@@ -49,10 +91,12 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           booking_number: string
+          cancellation_fee?: number | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           completed_at?: string | null
+          confirmed_at?: string | null
           coordinates?: unknown | null
           created_at?: string
           customer_id: string
@@ -66,6 +110,8 @@ export type Database = {
           provider_earnings?: number | null
           provider_user_id: string
           recurring_schedule?: Json | null
+          refund_amount?: number | null
+          refund_processed_at?: string | null
           service_address: string
           service_city?: string | null
           service_date: string
@@ -80,10 +126,12 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           booking_number?: string
+          cancellation_fee?: number | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           completed_at?: string | null
+          confirmed_at?: string | null
           coordinates?: unknown | null
           created_at?: string
           customer_id?: string
@@ -97,6 +145,8 @@ export type Database = {
           provider_earnings?: number | null
           provider_user_id?: string
           recurring_schedule?: Json | null
+          refund_amount?: number | null
+          refund_processed_at?: string | null
           service_address?: string
           service_city?: string | null
           service_date?: string
@@ -925,6 +975,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_cancellation_fee: {
+        Args: { booking_amount: number; booking_date: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -934,6 +988,15 @@ export type Database = {
       }
       is_admin: {
         Args: { _user_id: string }
+        Returns: boolean
+      }
+      update_booking_status: {
+        Args: {
+          booking_uuid: string
+          new_status: Database["public"]["Enums"]["booking_status"]
+          status_notes?: string
+          user_uuid: string
+        }
         Returns: boolean
       }
     }
@@ -952,6 +1015,7 @@ export type Database = {
         | "completed"
         | "cancelled"
         | "disputed"
+        | "confirmed"
       dispute_status: "open" | "investigating" | "resolved" | "closed"
       dispute_type:
         | "service_quality"
@@ -1134,6 +1198,7 @@ export const Constants = {
         "completed",
         "cancelled",
         "disputed",
+        "confirmed",
       ],
       dispute_status: ["open", "investigating", "resolved", "closed"],
       dispute_type: [
