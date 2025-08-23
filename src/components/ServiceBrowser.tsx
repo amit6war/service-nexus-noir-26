@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useServices, Service } from '@/hooks/useServices';
 import { useCart } from '@/hooks/useCart';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import ServiceProviderFlow from './ServiceProviderFlow';
 
 const ServiceBrowser = () => {
@@ -284,7 +284,7 @@ const ServiceBrowser = () => {
 
                     <div className="flex items-center gap-1">
                       <Users className="w-4 h-4 text-muted-foreground" />
-                      <span>5+ providers</span>
+                      <span>6+ providers</span>
                     </div>
                   </div>
                   

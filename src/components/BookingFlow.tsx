@@ -41,15 +41,21 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'
   ];
 
-  // Mock booked slots - in real app this would come from backend
+  // Mock booked slots - simulating backend data
   const bookedSlots = [
-    { date: format(new Date(), 'yyyy-MM-dd'), time: '10:00' },
-    { date: format(addDays(new Date(), 1), 'yyyy-MM-dd'), time: '14:00' }
+    { provider_id: provider.id, date: format(new Date(), 'yyyy-MM-dd'), time: '10:00' },
+    { provider_id: provider.id, date: format(addDays(new Date(), 1), 'yyyy-MM-dd'), time: '14:00' },
+    { provider_id: 'provider-2', date: format(new Date(), 'yyyy-MM-dd'), time: '11:00' },
+    { provider_id: 'provider-3', date: format(addDays(new Date(), 2), 'yyyy-MM-dd'), time: '15:00' }
   ];
 
   const checkTimeSlotAvailability = (date: Date, time: string) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return !bookedSlots.some(slot => slot.date === dateStr && slot.time === time);
+    return !bookedSlots.some(slot => 
+      slot.provider_id === provider.id && 
+      slot.date === dateStr && 
+      slot.time === time
+    );
   };
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -61,8 +67,9 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
   const handleTimeSlotSelect = (time: string) => {
     if (!selectedDate) return;
     
+    // Check if this provider is available at this time
     if (!checkTimeSlotAvailability(selectedDate, time)) {
-      setConflictError('This time slot is already booked. Please choose a different time.');
+      setConflictError(`${provider.business_name} is already booked for this time slot. Please choose a different time.`);
       return;
     }
     
@@ -82,7 +89,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
 
     // Final availability check before adding to cart
     if (!checkTimeSlotAvailability(selectedDate, selectedTimeSlot)) {
-      setConflictError('This time slot was just booked by another customer. Please choose a different time.');
+      setConflictError(`${provider.business_name} is no longer available at this time. Please choose a different slot.`);
       return;
     }
 
@@ -105,7 +112,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
       if (success) {
         toast({
           title: 'Added to Cart',
-          description: `${service.title} with ${provider.business_name} has been added to your cart.`
+          description: `${service.title} with ${provider.business_name} scheduled for ${format(selectedDate, 'PPP')} at ${selectedTimeSlot} has been added to your cart.`
         });
         onComplete();
       }
@@ -145,15 +152,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-teal/20 rounded-full flex items-center justify-center">
-                  {provider.portfolio_images?.[0] ? (
-                    <img
-                      src={provider.portfolio_images[0]}
-                      alt={provider.business_name}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <User className="w-6 h-6 text-teal" />
-                  )}
+                  <User className="w-6 h-6 text-teal" />
                 </div>
                 <div>
                   <h3 className="font-semibold">{provider.business_name}</h3>
@@ -224,7 +223,6 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
                     onSelect={handleDateSelect}
                     disabled={isDateDisabled}
                     initialFocus
-                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>

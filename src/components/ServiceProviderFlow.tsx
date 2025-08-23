@@ -23,7 +23,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
 
   if (!selectedService) return null;
 
-  // Generate dummy providers for each service with varied pricing
+  // Generate 6 dummy providers for each service with varied pricing
   const generateDummyProviders = (service: Service) => {
     const basePrice = service.base_price || 100;
     const maxPrice = basePrice * 1.5; // Admin set maximum (50% above base)
@@ -36,12 +36,13 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
         total_reviews: 247,
         user_id: 'provider-1',
         verification_status: 'approved',
-        description: 'Premium quality service with 10+ years experience',
+        description: 'Premium quality service with 10+ years experience. Specialized in high-end residential and commercial projects.',
         years_experience: 12,
         portfolio_images: [],
-        price: Math.round(maxPrice * 0.95), // 95% of max price
+        price: Math.round(maxPrice * 1.0), // 100% of max price
         availability: 'Available today',
-        location: 'Downtown Area'
+        location: 'Downtown Area',
+        certifications: ['Licensed', 'Insured', 'Bonded']
       },
       {
         id: 'provider-2',
@@ -50,12 +51,13 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
         total_reviews: 189,
         user_id: 'provider-2',
         verification_status: 'approved',
-        description: 'Fast and efficient service delivery',
+        description: 'Fast and efficient service delivery with same-day availability for urgent needs.',
         years_experience: 8,
         portfolio_images: [],
-        price: Math.round(maxPrice * 0.80), // 80% of max price
+        price: Math.round(maxPrice * 0.85), // 85% of max price
         availability: 'Available tomorrow',
-        location: 'North Side'
+        location: 'North Side',
+        certifications: ['Licensed', 'Insured']
       },
       {
         id: 'provider-3',
@@ -64,12 +66,13 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
         total_reviews: 156,
         user_id: 'provider-3',
         verification_status: 'approved',
-        description: 'Specialized in quality service delivery',
+        description: 'Specialized team with focus on quality and customer satisfaction.',
         years_experience: 6,
         portfolio_images: [],
-        price: Math.round(maxPrice * 0.70), // 70% of max price
+        price: Math.round(maxPrice * 0.75), // 75% of max price
         availability: 'Available this week',
-        location: 'East District'
+        location: 'East District',
+        certifications: ['Licensed']
       },
       {
         id: 'provider-4',
@@ -78,12 +81,13 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
         total_reviews: 203,
         user_id: 'provider-4',
         verification_status: 'approved',
-        description: 'Same-day service available',
+        description: 'Emergency services available 24/7 with rapid response times.',
         years_experience: 9,
         portfolio_images: [],
-        price: Math.round(maxPrice * 0.85), // 85% of max price
+        price: Math.round(maxPrice * 0.90), // 90% of max price
         availability: 'Available now',
-        location: 'West Side'
+        location: 'West Side',
+        certifications: ['Licensed', 'Insured', '24/7 Emergency']
       },
       {
         id: 'provider-5',
@@ -92,12 +96,13 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
         total_reviews: 128,
         user_id: 'provider-5',
         verification_status: 'approved',
-        description: 'Affordable rates without compromising quality',
+        description: 'Affordable rates without compromising on quality. Perfect for budget-conscious customers.',
         years_experience: 5,
         portfolio_images: [],
         price: Math.round(maxPrice * 0.60), // 60% of max price
         availability: 'Available next week',
-        location: 'South Area'
+        location: 'South Area',
+        certifications: ['Licensed']
       },
       {
         id: 'provider-6',
@@ -106,12 +111,13 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
         total_reviews: 312,
         user_id: 'provider-6',
         verification_status: 'approved',
-        description: 'Top-rated service provider in the area',
+        description: 'Top-rated service provider with premium materials and exceptional craftsmanship.',
         years_experience: 15,
         portfolio_images: [],
-        price: Math.round(maxPrice), // Full max price
+        price: Math.round(maxPrice * 0.95), // 95% of max price
         availability: 'Available today',
-        location: 'Central District'
+        location: 'Central District',
+        certifications: ['Licensed', 'Insured', 'Bonded', 'Premium Certified']
       }
     ];
   };
