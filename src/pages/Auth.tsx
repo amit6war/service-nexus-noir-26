@@ -11,7 +11,7 @@ import ConfirmationPage from '@/components/auth/ConfirmationPage';
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, signIn, loading, profileRole } = useAuth(); // UPDATED: use profileRole from context
+  const { user, signIn, loading, profileRole } = useAuth();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const [isLogin, setIsLogin] = useState(true);
@@ -51,7 +51,7 @@ const Auth = () => {
             setConfirmationState('success');
             toast({
               title: "Email Confirmed!",
-              description: "Your account has been successfully verified.",
+              description: "Your account has been successfully verified. You can now sign in.",
             });
           }
         } catch (error) {
@@ -67,12 +67,13 @@ const Auth = () => {
   // Redirect if user is already logged in
   useEffect(() => {
     if (user && confirmationState !== 'success') {
+      console.log('[Auth] User logged in, redirecting based on role:', profileRole);
+      
       // Use role from profiles table for accurate routing
       const role = profileRole || 'customer';
-      console.log('Routing by profile role:', role);
-
+      
       if (role === 'customer') {
-        navigate('/customer-dashboard'); // FIXED: correct path
+        navigate('/customer-dashboard');
       } else if (role === 'provider') {
         navigate('/provider-dashboard');
       } else if (role === 'admin') {
@@ -83,15 +84,25 @@ const Auth = () => {
     }
   }, [user, navigate, confirmationState, profileRole]);
 
-  // Update the handleLoginSubmit function
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!loginData.email || !loginData.password) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter both email and password.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
   
     try {
       const { error } = await signIn(loginData.email, loginData.password);
       if (!error) {
         // Redirection handled by useEffect based on profileRole
+        console.log('[Auth] Login successful, waiting for redirect...');
       }
     } catch (error) {
       console.error('Login error:', error);

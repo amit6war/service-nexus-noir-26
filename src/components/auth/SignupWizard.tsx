@@ -57,12 +57,11 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
         return false;
       }
 
-      // Check if email exists in auth.users (we can't query directly, but signup will fail if email exists)
       // Check if phone exists in profiles
       if (existingProfiles && existingProfiles.length > 0) {
         toast({
           title: "Account Already Exists",
-          description: "This email or phone number is already registered. Please log in or use a different one.",
+          description: "This phone number is already registered. Please use a different one or sign in.",
           variant: "destructive",
         });
         return true;
@@ -119,28 +118,15 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
     
     setLocating(true);
     
-    // Use enhanced geolocation with high accuracy and detailed logging
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         
-        // Enhanced logging as requested
         console.log("Latitude:", latitude);
         console.log("Longitude:", longitude);
         console.log("Accuracy (meters):", accuracy);
-        console.log('Full position data:', {
-          latitude,
-          longitude,
-          accuracy,
-          altitude: position.coords.altitude,
-          altitudeAccuracy: position.coords.altitudeAccuracy,
-          heading: position.coords.heading,
-          speed: position.coords.speed,
-          timestamp: position.timestamp
-        });
         
         try {
-          // Get complete address data using exact coordinates
           console.log('Calling reverse geocode with coordinates:', latitude, longitude);
           const addressData = await reverseGeocode(latitude, longitude);
           console.log('Address data received:', addressData);
@@ -157,7 +143,6 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
           });
         } catch (error) {
           console.error('Reverse geocoding failed:', error);
-          // Fall back to coordinates
           setFormData(prev => ({ 
             ...prev, 
             location: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` 
@@ -189,9 +174,9 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
         });
       },
       {
-        enableHighAccuracy: true, // Forces GPS/Wi-Fi if available
-        timeout: 10000,           // Max wait time (as specified)
-        maximumAge: 0             // No cached position
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
       }
     );
   };
@@ -220,6 +205,27 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    // Basic password validation
+    if (formData.password.length < 6) {
+      toast({
+        title: "Weak Password",
+        description: "Password must be at least 6 characters long.",
         variant: "destructive",
       });
       return false;
@@ -292,9 +298,13 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
         location: formData.location
       };
 
-      const { error } = await signUp(formData.email, formData.password, userData);
+      console.log('[SignupWizard] Starting signup with role:', selectedRole);
+
+      // Pass the selected role to signUp
+      const { error } = await signUp(formData.email, formData.password, userData, selectedRole);
       
       if (error) {
+        console.error('[SignupWizard] Signup error:', error);
         if (error.message.includes('already registered') || error.message.includes('already exists')) {
           toast({
             title: "Account Already Exists",
@@ -305,13 +315,19 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
         return;
       }
 
+      console.log('[SignupWizard] Signup successful');
+
       // Handle post-signup operations for service providers
       if (selectedRole === 'provider') {
+        console.log('[SignupWizard] Processing provider documents...');
+        
         // Wait a moment for the user to be created
         setTimeout(async () => {
           try {
             const { data: { user: currentUser } } = await supabase.auth.getUser();
             if (currentUser) {
+              console.log('[SignupWizard] Updating provider profile...');
+              
               // Update profile role to pending_provider
               await supabase
                 .from('profiles')
@@ -375,7 +391,7 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
       } else {
         toast({
           title: "Account Created Successfully",
-          description: "Please check your email to verify your account.",
+          description: "Please check your email to verify your account before signing in.",
         });
       }
         
