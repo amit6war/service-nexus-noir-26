@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 export interface CartItem {
@@ -20,15 +20,8 @@ export const useShoppingCart = () => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [initialized, setInitialized] = useState(false);
   const { toast } = useToast();
-  
-  // Use ref to track current items for duplicate checking
-  const itemsRef = useRef<CartItem[]>([]);
 
-  // Update ref whenever items change
-  useEffect(() => {
-    itemsRef.current = items;
-    console.log('🛒 Items ref updated:', items.length, 'items');
-  }, [items]);
+  console.log('🛒 useShoppingCart hook render - items:', items.length, 'initialized:', initialized);
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -38,6 +31,7 @@ export const useShoppingCart = () => {
       if (savedCart) {
         const parsedCart = JSON.parse(savedCart);
         if (Array.isArray(parsedCart)) {
+          console.log('📥 Loading cart from storage:', parsedCart);
           setItems(parsedCart);
           console.log('✅ Cart loaded from storage:', parsedCart.length, 'items');
         }
@@ -57,20 +51,21 @@ export const useShoppingCart = () => {
   useEffect(() => {
     if (initialized) {
       try {
+        console.log('💾 Saving cart to storage:', items);
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-        console.log('💾 Cart saved to storage:', items.length, 'items');
+        console.log('✅ Cart saved to storage:', items.length, 'items');
       } catch (error) {
         console.error('❌ Error saving cart to storage:', error);
       }
     }
   }, [items, initialized]);
 
-  const addItem = useCallback((itemData: Omit<CartItem, 'id'>) => {
+  const addItem = useCallback(async (itemData: Omit<CartItem, 'id'>) => {
     console.log('🛒 ADD ITEM CALLED with:', itemData);
     
     return new Promise<boolean>((resolve) => {
       setItems(currentItems => {
-        console.log('🛒 Current items in state update:', currentItems.length);
+        console.log('🛒 Current items before update:', currentItems);
         
         // Check if service already exists with same provider
         const existingItem = currentItems.find(
@@ -110,13 +105,15 @@ export const useShoppingCart = () => {
         console.log('🛒 Creating new cart item:', newItem);
 
         const newItems = [...currentItems, newItem];
-        console.log('✅ Cart state updated - total items:', newItems.length);
-        console.log('🛒 New cart contents:', newItems);
+        console.log('✅ New cart state will be:', newItems);
 
-        toast({
-          title: "Added to cart",
-          description: `${itemData.service_title} has been added to your cart`,
-        });
+        // Use setTimeout to ensure toast shows after state update
+        setTimeout(() => {
+          toast({
+            title: "Added to cart",
+            description: `${itemData.service_title} has been added to your cart`,
+          });
+        }, 100);
 
         console.log('✅ ADD ITEM COMPLETED SUCCESSFULLY');
         resolve(true);
@@ -165,7 +162,7 @@ export const useShoppingCart = () => {
 
   const itemCount = items.length;
 
-  console.log('🛒 Hook state:', { itemCount, initialized, items: items.map(i => i.service_title) });
+  console.log('🛒 Hook returning state:', { itemCount, initialized, itemTitles: items.map(i => i.service_title) });
 
   return {
     items,
