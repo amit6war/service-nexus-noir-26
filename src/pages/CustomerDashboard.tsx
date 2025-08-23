@@ -24,7 +24,8 @@ import {
   Users,
   Phone,
   Shield,
-  LogOut
+  LogOut,
+  ShoppingCart
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -36,6 +37,9 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ServiceBrowser from '@/components/ServiceBrowser';
+import CartSidebar from '@/components/CartSidebar';
+import { useCart } from '@/hooks/useCart';
 
 interface ServiceRequest {
   id: string;
@@ -70,12 +74,14 @@ const CustomerDashboard = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { itemCount } = useCart();
   const [activeTab, setActiveTab] = useState('overview');
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [favoriteProviders, setFavoriteProviders] = useState<FavoriteProvider[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
   const [notifications, setNotifications] = useState(3);
   const [loading, setLoading] = useState(true);
+  const [cartOpen, setCartOpen] = useState(false);
 
   // Mock data for demonstration
   useEffect(() => {
@@ -178,8 +184,8 @@ const CustomerDashboard = () => {
 
   const sidebarItems = [
     { id: 'overview', label: 'Overview', icon: Home },
-    { id: 'services', label: 'My Services', icon: Search },
-    { id: 'bookings', label: 'Bookings', icon: Calendar },
+    { id: 'services', label: 'Browse Services', icon: Search },
+    { id: 'bookings', label: 'My Bookings', icon: Calendar },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'favorites', label: 'Favorite Providers', icon: Heart },
     { id: 'payments', label: 'Payments & Billing', icon: CreditCard },
@@ -276,6 +282,42 @@ const CustomerDashboard = () => {
 
         {/* Main Content */}
         <div className="flex-1 p-6">
+          {/* Header with Cart */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">
+                {activeTab === 'overview' && `Welcome back, ${user?.user_metadata?.first_name || 'Customer'}!`}
+                {activeTab === 'services' && 'Browse Services'}
+                {activeTab === 'bookings' && 'My Bookings'}
+                {activeTab === 'messages' && 'Messages'}
+                {activeTab === 'favorites' && 'Favorite Providers'}
+                {activeTab === 'payments' && 'Payments & Billing'}
+                {activeTab === 'notifications' && 'Notifications'}
+                {activeTab === 'profile' && 'Profile Settings'}
+                {activeTab === 'security' && 'Security'}
+                {activeTab === 'help' && 'Help & Support'}
+              </h1>
+              {activeTab === 'overview' && (
+                <p className="text-muted-foreground">
+                  Here's what's happening with your services today.
+                </p>
+              )}
+            </div>
+            
+            <Button
+              onClick={() => setCartOpen(true)}
+              className="relative bg-teal hover:bg-teal/90"
+            >
+              <ShoppingCart className="w-5 h-5 mr-2" />
+              Cart
+              {itemCount > 0 && (
+                <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full">
+                  {itemCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
+
           <AnimatePresence mode="wait">
             {activeTab === 'overview' && (
               <motion.div
@@ -285,16 +327,6 @@ const CustomerDashboard = () => {
                 exit={{ opacity: 0, y: -20 }}
                 className="space-y-6"
               >
-                {/* Welcome Header */}
-                <div className="mb-8">
-                  <h1 className="text-3xl font-bold text-foreground mb-2">
-                    Welcome back, {user?.user_metadata?.first_name || 'Customer'}!
-                  </h1>
-                  <p className="text-muted-foreground">
-                    Here's what's happening with your services today.
-                  </p>
-                </div>
-
                 {/* Quick Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                   <Card>
@@ -337,14 +369,51 @@ const CustomerDashboard = () => {
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm text-muted-foreground">Loyalty Points</p>
-                          <p className="text-2xl font-bold text-foreground">1,250</p>
+                          <p className="text-sm text-muted-foreground">Items in Cart</p>
+                          <p className="text-2xl font-bold text-foreground">{itemCount}</p>
                         </div>
-                        <Gift className="w-8 h-8 text-purple-500" />
+                        <ShoppingCart className="w-8 h-8 text-purple-500" />
                       </div>
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* Quick Actions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Quick Actions</CardTitle>
+                    <CardDescription>Get started with common tasks</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Button
+                        onClick={() => setActiveTab('services')}
+                        className="bg-teal hover:bg-teal/90 h-auto p-4 flex-col"
+                      >
+                        <Search className="w-6 h-6 mb-2" />
+                        <span>Browse Services</span>
+                      </Button>
+                      
+                      <Button
+                        onClick={() => setActiveTab('bookings')}
+                        variant="outline"
+                        className="h-auto p-4 flex-col"
+                      >
+                        <Calendar className="w-6 h-6 mb-2" />
+                        <span>View Bookings</span>
+                      </Button>
+                      
+                      <Button
+                        onClick={() => setCartOpen(true)}
+                        variant="outline"
+                        className="h-auto p-4 flex-col"
+                      >
+                        <ShoppingCart className="w-6 h-6 mb-2" />
+                        <span>View Cart ({itemCount})</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Recent Service Requests */}
                 <Card>
@@ -457,11 +526,28 @@ const CustomerDashboard = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
+              >
+                <ServiceBrowser />
+              </motion.div>
+            )}
+
+            {activeTab === 'bookings' && (
+              <motion.div
+                key="bookings"  
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
                 className="space-y-6"
               >
                 <div className="flex items-center justify-between">
-                  <h1 className="text-3xl font-bold text-foreground">My Services</h1>
-                  <Button className="bg-teal hover:bg-teal/90">
+                  <div>
+                    <h2 className="text-2xl font-bold text-foreground">My Bookings</h2>
+                    <p className="text-muted-foreground">Track your service requests and appointments</p>
+                  </div>
+                  <Button
+                    onClick={() => setActiveTab('services')}
+                    className="bg-teal hover:bg-teal/90"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Book New Service
                   </Button>
@@ -469,40 +555,56 @@ const CustomerDashboard = () => {
                 
                 <Tabs defaultValue="all" className="w-full">
                   <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="all">All Services</TabsTrigger>
+                    <TabsTrigger value="all">All Bookings</TabsTrigger>
                     <TabsTrigger value="active">Active</TabsTrigger>
                     <TabsTrigger value="completed">Completed</TabsTrigger>
                     <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="all" className="space-y-4">
-                    {serviceRequests.map((request) => (
-                      <Card key={request.id}>
-                        <CardContent className="p-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <Avatar>
-                                <AvatarFallback>{request.provider_name[0]}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <h3 className="font-semibold text-foreground">{request.service_name}</h3>
-                                <p className="text-muted-foreground">{request.provider_name}</p>
-                                <p className="text-sm text-muted-foreground mt-1">{request.description}</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <Badge className={`mb-2 ${getStatusColor(request.status)} text-white`}>
-                                {request.status.replace('_', ' ')}
-                              </Badge>
-                              <p className="text-lg font-semibold text-foreground">${request.price}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {new Date(request.scheduled_date).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
+                    {serviceRequests.length === 0 ? (
+                      <Card>
+                        <CardContent className="p-6 text-center">
+                          <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold text-foreground mb-2">No bookings yet</h3>
+                          <p className="text-muted-foreground mb-4">Start by browsing our available services</p>
+                          <Button
+                            onClick={() => setActiveTab('services')}
+                            className="bg-teal hover:bg-teal/90"
+                          >
+                            Browse Services
+                          </Button>
                         </CardContent>
                       </Card>
-                    ))}
+                    ) : (
+                      serviceRequests.map((request) => (
+                        <Card key={request.id}>
+                          <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <Avatar>
+                                  <AvatarFallback>{request.provider_name[0]}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <h3 className="font-semibold text-foreground">{request.service_name}</h3>
+                                  <p className="text-muted-foreground">{request.provider_name}</p>
+                                  <p className="text-sm text-muted-foreground mt-1">{request.description}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <Badge className={`mb-2 ${getStatusColor(request.status)} text-white`}>
+                                  {request.status.replace('_', ' ')}
+                                </Badge>
+                                <p className="text-lg font-semibold text-foreground">${request.price}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {new Date(request.scheduled_date).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
                   </TabsContent>
                 </Tabs>
               </motion.div>
@@ -636,7 +738,6 @@ const CustomerDashboard = () => {
               </motion.div>
             )}
 
-            {/* Add more tab content for other sections */}
             {activeTab === 'messages' && (
               <motion.div
                 key="messages"
@@ -715,6 +816,9 @@ const CustomerDashboard = () => {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Cart Sidebar */}
+      <CartSidebar isOpen={cartOpen} onClose={() => setCartOpen(false)} />
     </div>
   );
 };
