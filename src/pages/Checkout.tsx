@@ -4,20 +4,16 @@ import { motion } from 'framer-motion';
 import { ShoppingCart, CreditCard, MapPin, Calendar, Clock, User, CheckCircle, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
-import { useBookingsActions } from '@/hooks/useBookingsActions';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import AddressManager, { Address } from '@/components/AddressManager';
+import { supabase } from '@/integrations/supabase/client';
 
 const Checkout = () => {
   const { items, getTotalPrice, clearCart } = useShoppingCart();
-  const { createBookingsFromCart } = useBookingsActions();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -61,37 +57,43 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      // TODO: Integrate with Stripe payment processing
-      // For now, simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('Creating Stripe checkout session...');
 
-      // Convert selected address to the format expected by createBookingsFromCart
-      const addressForBooking = {
+      // Convert selected address to the format expected
+      const addressForCheckout = {
         address_line_1: selectedAddress.address_line_1,
         address_line_2: selectedAddress.address_line_2 || '',
         city: selectedAddress.city,
         state: selectedAddress.state,
-        zip_code: selectedAddress.postal_code,
+        postal_code: selectedAddress.postal_code,
         country: selectedAddress.country
       };
 
-      // Create bookings from cart items
-      const success = await createBookingsFromCart(items, addressForBooking);
+      // Call the Stripe checkout edge function
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          items: items,
+          address: addressForCheckout
+        }
+      });
 
-      if (success) {
-        // Clear cart after successful booking creation
-        clearCart();
-        
-        toast({
-          title: 'Payment Successful!',
-          description: 'Your bookings have been confirmed and moved to My Bookings.',
-        });
-
-        // Navigate to customer dashboard to show bookings
-        navigate('/customer-dashboard');
-      } else {
-        throw new Error('Failed to create bookings');
+      if (error) {
+        console.error('Checkout error:', error);
+        throw error;
       }
+
+      if (!data?.url) {
+        throw new Error('No checkout URL received');
+      }
+
+      console.log('Redirecting to Stripe checkout...');
+      
+      // Clear cart before redirecting to Stripe
+      clearCart();
+      
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+
     } catch (error) {
       console.error('Payment error:', error);
       toast({
@@ -193,7 +195,7 @@ const Checkout = () => {
               </Card>
             </div>
 
-            {/* Service Address & Payment Form */}
+            {/* Service Address & Payment */}
             <div className="space-y-6">
               {/* Service Address Selection */}
               <Card>
@@ -212,49 +214,29 @@ const Checkout = () => {
                 </CardContent>
               </Card>
 
-              {/* Payment Method */}
+              {/* Payment Information */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="w-5 h-5" />
-                    Payment Method
+                    Payment with Stripe
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="cardNumber">Card Number</Label>
-                      <Input
-                        id="cardNumber"
-                        placeholder="1234 5678 9012 3456"
-                        disabled={loading}
-                      />
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-semibold text-blue-800 mb-2">Test Payment Information</h4>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      <p><strong>Test Card:</strong> 4242 4242 4242 4242</p>
+                      <p><strong>Expiry:</strong> Any future date (e.g., 12/25)</p>
+                      <p><strong>CVV:</strong> Any 3 digits (e.g., 123)</p>
+                      <p><strong>ZIP:</strong> Any 5 digits (e.g., 12345)</p>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="expiry">Expiry Date</Label>
-                        <Input
-                          id="expiry"
-                          placeholder="MM/YY"
-                          disabled={loading}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="cvv">CVV</Label>
-                        <Input
-                          id="cvv"
-                          placeholder="123"
-                          disabled={loading}
-                        />
-                      </div>
-                    </div>
+                  </div>
 
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-800">
-                        <strong>Test Mode:</strong> Use test card number 4242 4242 4242 4242 with any future expiry date and any 3-digit CVV.
-                      </p>
-                    </div>
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      <strong>Secure Payment:</strong> You'll be redirected to Stripe's secure checkout page to complete your payment.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -273,12 +255,12 @@ const Checkout = () => {
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
                     />
-                    Processing Payment...
+                    Creating Checkout Session...
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5" />
-                    Pay ${totalPrice}
+                    Pay ${totalPrice} with Stripe
                   </div>
                 )}
               </Button>
