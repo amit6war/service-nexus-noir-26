@@ -35,10 +35,8 @@ export const useCart = () => {
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    if (cartItems.length > 0) {
-      console.log('Saving cart to localStorage:', cartItems);
-      localStorage.setItem('servicenexus_cart', JSON.stringify(cartItems));
-    }
+    console.log('Cart items changed, saving to localStorage:', cartItems);
+    localStorage.setItem('servicenexus_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
   const addToCart = (item: Omit<CartItem, 'id'>) => {
@@ -77,10 +75,10 @@ export const useCart = () => {
     };
 
     console.log('Adding new item to cart:', newItem);
-    setCartItems(prev => {
-      const updated = [...prev, newItem];
-      console.log('Updated cart items:', updated);
-      return updated;
+    setCartItems(prevItems => {
+      const updatedItems = [...prevItems, newItem];
+      console.log('Cart updated with new items:', updatedItems);
+      return updatedItems;
     });
     
     toast({
@@ -92,10 +90,10 @@ export const useCart = () => {
 
   const removeFromCart = (itemId: string) => {
     console.log('Removing item from cart:', itemId);
-    setCartItems(prev => {
-      const updated = prev.filter(item => item.id !== itemId);
-      console.log('Updated cart after removal:', updated);
-      return updated;
+    setCartItems(prevItems => {
+      const updatedItems = prevItems.filter(item => item.id !== itemId);
+      console.log('Cart updated after removal:', updatedItems);
+      return updatedItems;
     });
     toast({
       title: "Removed from cart",
@@ -105,7 +103,7 @@ export const useCart = () => {
 
   const updateCartItem = (itemId: string, updates: Partial<CartItem>) => {
     console.log('Updating cart item:', itemId, updates);
-    setCartItems(prev => prev.map(item => 
+    setCartItems(prevItems => prevItems.map(item => 
       item.id === itemId ? { ...item, ...updates } : item
     ));
   };
@@ -126,13 +124,8 @@ export const useCart = () => {
     return total;
   };
 
-  const getItemCount = () => {
-    const count = cartItems.length;
-    console.log('Item count:', count);
-    return count;
-  };
-
-  console.log('useCart hook state:', { cartItems: cartItems.length, itemCount: getItemCount() });
+  const itemCount = cartItems.length;
+  console.log('Current cart state - items:', cartItems.length, 'itemCount:', itemCount);
 
   return {
     cartItems,
@@ -141,6 +134,6 @@ export const useCart = () => {
     updateCartItem,
     clearCart,
     getTotalPrice,
-    itemCount: getItemCount()
+    itemCount
   };
 };
