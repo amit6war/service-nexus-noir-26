@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -22,6 +23,7 @@ export const useShoppingCart = () => {
 
   // Load cart from localStorage on mount
   useEffect(() => {
+    console.log('🛒 Initializing cart from localStorage...');
     try {
       const savedCart = localStorage.getItem(CART_STORAGE_KEY);
       if (savedCart) {
@@ -30,16 +32,19 @@ export const useShoppingCart = () => {
           setItems(parsedCart);
           console.log('✅ Cart loaded from storage:', parsedCart.length, 'items');
         }
+      } else {
+        console.log('📭 No existing cart found in storage');
       }
     } catch (error) {
       console.error('❌ Error loading cart from storage:', error);
       localStorage.removeItem(CART_STORAGE_KEY);
     } finally {
       setInitialized(true);
+      console.log('✅ Cart initialization complete');
     }
   }, []);
 
-  // Save to localStorage whenever items change
+  // Save to localStorage whenever items change (but only after initialization)
   useEffect(() => {
     if (initialized) {
       try {
@@ -52,7 +57,7 @@ export const useShoppingCart = () => {
   }, [items, initialized]);
 
   const addItem = useCallback((itemData: Omit<CartItem, 'id'>) => {
-    console.log('🛒 Adding item to cart:', itemData);
+    console.log('🛒 ADD ITEM CALLED with:', itemData);
     
     // Check if service already exists with same provider
     const existingItem = items.find(
@@ -81,16 +86,19 @@ export const useShoppingCart = () => {
       return false;
     }
 
-    // Create new item
+    // Create new item with unique ID
     const newItem: CartItem = {
       ...itemData,
       id: `cart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };
 
-    // Update state
+    console.log('🛒 Creating new cart item:', newItem);
+
+    // Update state immediately
     setItems(prevItems => {
       const newItems = [...prevItems, newItem];
-      console.log('✅ Cart updated - total items:', newItems.length);
+      console.log('✅ Cart state updated - total items:', newItems.length);
+      console.log('🛒 New cart contents:', newItems);
       return newItems;
     });
 
@@ -99,6 +107,7 @@ export const useShoppingCart = () => {
       description: `${itemData.service_title} has been added to your cart`,
     });
 
+    console.log('✅ ADD ITEM COMPLETED SUCCESSFULLY');
     return true;
   }, [items, toast]);
 
@@ -142,7 +151,7 @@ export const useShoppingCart = () => {
 
   const itemCount = items.length;
 
-  console.log('🛒 Current cart state:', { itemCount, initialized });
+  console.log('🛒 Hook state:', { itemCount, initialized, items: items.map(i => i.service_title) });
 
   return {
     items,

@@ -79,7 +79,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
   };
 
   const handleConfirmBooking = async () => {
-    console.log('Confirm booking clicked');
+    console.log('🛒 Confirm booking clicked - starting add to cart process');
     
     if (!selectedDate || !selectedTimeSlot) {
       toast({
@@ -101,7 +101,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     try {
       const scheduledDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot}:00`;
       
-      console.log('Adding to cart:', {
+      const cartItem = {
         service_id: service.id,
         provider_id: provider.user_id || provider.id,
         service_title: service.title,
@@ -110,30 +110,26 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
         duration_minutes: service.duration_minutes,
         scheduled_date: scheduledDateTime,
         special_instructions: specialInstructions
-      });
+      };
 
-      const success = addItem({
-        service_id: service.id,
-        provider_id: provider.user_id || provider.id,
-        service_title: service.title,
-        provider_name: provider.business_name,
-        price: provider.price,
-        duration_minutes: service.duration_minutes,
-        scheduled_date: scheduledDateTime,
-        special_instructions: specialInstructions
-      });
+      console.log('🛒 Adding item to cart:', cartItem);
 
-      console.log('Add to cart result:', success);
+      const success = addItem(cartItem);
+
+      console.log('🛒 Add to cart result:', success);
 
       if (success) {
+        console.log('✅ Successfully added to cart');
         toast({
           title: 'Added to Cart!',
-          description: `${service.title} with ${provider.business_name} scheduled for ${format(selectedDate, 'PPP')} at ${selectedTimeSlot} has been added to your cart.`
+          description: `${service.title} with ${provider.business_name} has been added to your cart.`
         });
         onComplete();
+      } else {
+        console.log('❌ Failed to add to cart');
       }
     } catch (error) {
-      console.error('Error adding to cart:', error);
+      console.error('❌ Error adding to cart:', error);
       toast({
         title: 'Error',
         description: 'Failed to add booking to cart. Please try again.',
