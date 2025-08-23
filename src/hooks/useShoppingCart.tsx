@@ -60,79 +60,77 @@ export const useShoppingCart = () => {
     }
   }, [items, initialized]);
 
-  const addItem = useCallback(async (itemData: Omit<CartItem, 'id'>) => {
+  const addItem = useCallback((itemData: Omit<CartItem, 'id'>) => {
     console.log('🛒 ADD ITEM CALLED with:', itemData);
     
-    return new Promise<boolean>((resolve) => {
-      setItems(currentItems => {
-        console.log('🛒 Current items before update:', currentItems);
-        
-        // Check if service already exists with same provider
-        const existingItem = currentItems.find(
-          item => item.service_id === itemData.service_id && item.provider_id === itemData.provider_id
-        );
+    // Check if service already exists with same provider
+    const existingItem = items.find(
+      item => item.service_id === itemData.service_id && item.provider_id === itemData.provider_id
+    );
 
-        if (existingItem) {
-          console.log('⚠️ Item already exists in cart');
-          toast({
-            title: "Already in cart",
-            description: "This service from this provider is already in your cart",
-            variant: "destructive"
-          });
-          resolve(false);
-          return currentItems;
-        }
-
-        // Check if service already exists with different provider
-        const serviceExists = currentItems.find(item => item.service_id === itemData.service_id);
-        if (serviceExists) {
-          console.log('⚠️ Service already exists with different provider');
-          toast({
-            title: "Service already selected",
-            description: "You can only select one provider per service type. Remove the existing one first.",
-            variant: "destructive"
-          });
-          resolve(false);
-          return currentItems;
-        }
-
-        // Create new item with unique ID
-        const newItem: CartItem = {
-          ...itemData,
-          id: `cart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        };
-
-        console.log('🛒 Creating new cart item:', newItem);
-
-        const newItems = [...currentItems, newItem];
-        console.log('✅ New cart state will be:', newItems);
-
-        // Use setTimeout to ensure toast shows after state update
-        setTimeout(() => {
-          toast({
-            title: "Added to cart",
-            description: `${itemData.service_title} has been added to your cart`,
-          });
-        }, 100);
-
-        console.log('✅ ADD ITEM COMPLETED SUCCESSFULLY');
-        resolve(true);
-        return newItems;
+    if (existingItem) {
+      console.log('⚠️ Item already exists in cart');
+      toast({
+        title: "Already in cart",
+        description: "This service from this provider is already in your cart",
+        variant: "destructive"
       });
+      return Promise.resolve(false);
+    }
+
+    // Check if service already exists with different provider
+    const serviceExists = items.find(item => item.service_id === itemData.service_id);
+    if (serviceExists) {
+      console.log('⚠️ Service already exists with different provider');
+      toast({
+        title: "Service already selected",
+        description: "You can only select one provider per service type. Remove the existing one first.",
+        variant: "destructive"
+      });
+      return Promise.resolve(false);
+    }
+
+    // Create new item with unique ID
+    const newItem: CartItem = {
+      ...itemData,
+      id: `cart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    };
+
+    console.log('🛒 Creating new cart item:', newItem);
+
+    // Update state directly
+    setItems(currentItems => {
+      const newItems = [...currentItems, newItem];
+      console.log('✅ New cart state updated:', newItems.length, 'items');
+      return newItems;
     });
-  }, [toast]);
+
+    // Show success toast
+    toast({
+      title: "Added to cart",
+      description: `${itemData.service_title} has been added to your cart`,
+    });
+
+    console.log('✅ ADD ITEM COMPLETED SUCCESSFULLY');
+    return Promise.resolve(true);
+  }, [items, toast]);
 
   const removeItem = useCallback((itemId: string) => {
     console.log('🗑️ Removing item from cart:', itemId);
+    
     setItems(prevItems => {
+      const itemToRemove = prevItems.find(item => item.id === itemId);
       const newItems = prevItems.filter(item => item.id !== itemId);
       console.log('✅ Item removed - remaining items:', newItems.length);
+      
+      if (itemToRemove) {
+        toast({
+          title: "Removed from cart",
+          description: `${itemToRemove.service_title} has been removed from your cart`,
+        });
+      }
+      
       return newItems;
-    });
-    
-    toast({
-      title: "Removed from cart",
-      description: "Service has been removed from your cart",
     });
   }, [toast]);
 

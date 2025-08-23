@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Calendar, Clock, User, Star, DollarSign, CalendarIcon, AlertCircle } from 'lucide-react';
@@ -119,10 +120,8 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
 
       if (success) {
         console.log('✅ Successfully added to cart - closing booking flow');
-        // Small delay to ensure state updates propagate
-        setTimeout(() => {
-          onComplete();
-        }, 200);
+        // Close the booking flow immediately after successful addition
+        onComplete();
       } else {
         console.log('❌ Failed to add to cart');
       }
