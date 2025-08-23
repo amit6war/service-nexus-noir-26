@@ -1,14 +1,18 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Calendar, Clock, User, Star, DollarSign } from 'lucide-react';
+import { X, Calendar, Clock, User, Star, DollarSign, CalendarIcon, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
+import { format, addDays, isBefore, isToday, startOfDay } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface BookingFlowProps {
   service: any;
@@ -23,34 +27,78 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
   onClose,
   onComplete
 }) => {
-  const [selectedDateTime, setSelectedDateTime] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date>();
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [loading, setLoading] = useState(false);
+  const [conflictError, setConflictError] = useState('');
   
   const { addToCart } = useCart();
   const { toast } = useToast();
 
+  // Generate available time slots
+  const timeSlots = [
+    '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'
+  ];
+
+  // Mock booked slots - in real app this would come from backend
+  const bookedSlots = [
+    { date: format(new Date(), 'yyyy-MM-dd'), time: '10:00' },
+    { date: format(addDays(new Date(), 1), 'yyyy-MM-dd'), time: '14:00' }
+  ];
+
+  const checkTimeSlotAvailability = (date: Date, time: string) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return !bookedSlots.some(slot => slot.date === dateStr && slot.time === time);
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date);
+    setSelectedTimeSlot('');
+    setConflictError('');
+  };
+
+  const handleTimeSlotSelect = (time: string) => {
+    if (!selectedDate) return;
+    
+    if (!checkTimeSlotAvailability(selectedDate, time)) {
+      setConflictError('This time slot is already booked. Please choose a different time.');
+      return;
+    }
+    
+    setSelectedTimeSlot(time);
+    setConflictError('');
+  };
+
   const handleConfirmBooking = async () => {
-    if (!selectedDateTime) {
+    if (!selectedDate || !selectedTimeSlot) {
       toast({
         title: 'Date & Time Required',
-        description: 'Please select a date and time for your booking.',
+        description: 'Please select both a date and time for your booking.',
         variant: 'destructive'
       });
+      return;
+    }
+
+    // Final availability check before adding to cart
+    if (!checkTimeSlotAvailability(selectedDate, selectedTimeSlot)) {
+      setConflictError('This time slot was just booked by another customer. Please choose a different time.');
       return;
     }
 
     setLoading(true);
 
     try {
+      const scheduledDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot}:00`;
+      
       const success = addToCart({
         service_id: service.id,
-        provider_id: provider.user_id,
+        provider_id: provider.user_id || provider.id,
         service_title: service.title,
         provider_name: provider.business_name,
-        price: service.base_price,
+        price: provider.price,
         duration_minutes: service.duration_minutes,
-        scheduled_date: selectedDateTime,
+        scheduled_date: scheduledDateTime,
         special_instructions: specialInstructions
       });
 
@@ -70,6 +118,10 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const isDateDisabled = (date: Date) => {
+    return isBefore(startOfDay(date), startOfDay(new Date()));
   };
 
   return (
@@ -129,7 +181,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Price:</span>
                   <span className="text-xl font-bold text-teal">
-                    ${service.base_price}
+                    ${provider.price}
                     {service.price_type === 'hourly' ? '/hr' : ''}
                   </span>
                 </div>
@@ -145,22 +197,80 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
             </CardContent>
           </Card>
 
-          {/* Booking Form */}
+          {/* Date Selection */}
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
+              <label className="block text-sm font-medium text-foreground mb-3">
                 <Calendar className="w-4 h-4 inline mr-2" />
-                Select Date & Time *
+                Select Date *
               </label>
-              <Input
-                type="datetime-local"
-                value={selectedDateTime}
-                onChange={(e) => setSelectedDateTime(e.target.value)}
-                min={new Date().toISOString().slice(0, 16)}
-                className="w-full"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    disabled={isDateDisabled}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
+            {/* Time Slot Selection */}
+            {selectedDate && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-3">
+                  <Clock className="w-4 h-4 inline mr-2" />
+                  Select Time Slot *
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {timeSlots.map((time) => {
+                    const isAvailable = checkTimeSlotAvailability(selectedDate, time);
+                    const isSelected = selectedTimeSlot === time;
+                    
+                    return (
+                      <Button
+                        key={time}
+                        variant={isSelected ? "default" : "outline"}
+                        className={cn(
+                          "h-10",
+                          isSelected && "bg-teal hover:bg-teal/90",
+                          !isAvailable && "opacity-50 cursor-not-allowed"
+                        )}
+                        onClick={() => handleTimeSlotSelect(time)}
+                        disabled={!isAvailable}
+                      >
+                        {time}
+                        {!isAvailable && <span className="ml-1 text-xs">(Booked)</span>}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                {conflictError && (
+                  <div className="flex items-center gap-2 mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-600" />
+                    <span className="text-sm text-red-600">{conflictError}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Special Instructions */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 Special Instructions (Optional)
@@ -187,7 +297,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
               <Button
                 onClick={handleConfirmBooking}
                 className="flex-1 bg-teal hover:bg-teal/90"
-                disabled={loading}
+                disabled={loading || !selectedDate || !selectedTimeSlot}
               >
                 {loading ? 'Adding to Cart...' : 'Add to Cart'}
               </Button>
