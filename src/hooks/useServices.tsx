@@ -106,7 +106,7 @@ export const useServices = () => {
             title: service.title,
             description: service.description || '',
             category: service.category,
-            subcategory: service.subcategory,
+            subcategory: service.subcategory || undefined,
             base_price: service.base_price || 0,
             duration_minutes: service.duration_minutes || 30,
             price_type: service.price_type || 'fixed',

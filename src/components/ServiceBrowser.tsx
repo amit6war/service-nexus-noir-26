@@ -60,7 +60,7 @@ const ServiceBrowser = () => {
   };
 
   const handleViewProvider = (providerId: string) => {
-    navigate(`/provider-profile/${providerId}`);
+    navigate(`/provider-detail/${providerId}`);
   };
 
   const clearFilters = () => {
@@ -170,7 +170,7 @@ const ServiceBrowser = () => {
                   <Checkbox
                     id="emergency"
                     checked={emergencyOnly}
-                    onCheckedChange={setEmergencyOnly}
+                    onCheckedChange={(checked) => setEmergencyOnly(checked === true)}
                   />
                   <label htmlFor="emergency" className="text-sm font-medium text-foreground">
                     Emergency Services Only
@@ -182,7 +182,7 @@ const ServiceBrowser = () => {
                   <Checkbox
                     id="featured"
                     checked={featuredOnly}
-                    onCheckedChange={setFeaturedOnly}
+                    onCheckedChange={(checked) => setFeaturedOnly(checked === true)}
                   />
                   <label htmlFor="featured" className="text-sm font-medium text-foreground">
                     Featured Services Only
