@@ -84,6 +84,9 @@ serve(async (req) => {
 
     console.log("Creating checkout session...");
 
+    // Build compact metadata to stay well under Stripe's 500-char per value limit
+    const compactItemIds = items.map((i: any) => String(i.service_id)).slice(0, 20).join("|"); // cap to 20 ids for safety
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -94,15 +97,9 @@ serve(async (req) => {
       cancel_url: `${req.headers.get("origin")}/checkout?payment=cancelled`,
       metadata: {
         user_id: userData.user.id,
-        items: JSON.stringify(items.map(item => ({
-          service_id: item.service_id,
-          provider_id: item.provider_id,
-          price: item.price,
-          scheduled_date: item.scheduled_date,
-          special_instructions: item.special_instructions,
-          duration_minutes: item.duration_minutes
-        }))),
-        address: JSON.stringify(address)
+        item_ids: compactItemIds,
+        item_count: String(items.length),
+        // address and full cart details intentionally omitted to avoid Stripe metadata limits
       }
     });
 
