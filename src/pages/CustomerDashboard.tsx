@@ -24,7 +24,6 @@ const CustomerDashboard = () => {
 
   const handleServiceSelect = (service) => {
     setSelectedService(service);
-    setActiveTab('providers');
   };
 
   const handleProviderSelect = (provider) => {
@@ -252,14 +251,13 @@ const CustomerDashboard = () => {
             )}
 
             {/* Service Provider Selection */}
-            {activeTab === 'providers' && selectedService && (
+            {activeTab === 'browse' && selectedService && (
               <ServiceProviderFlow
                 selectedService={selectedService}
                 onBack={() => {
                   setSelectedService(null);
-                  setActiveTab('browse');
                 }}
-                onBookService={handleProviderSelect}
+                onBookService={handleBookingComplete}
               />
             )}
 

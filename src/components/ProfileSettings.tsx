@@ -17,7 +17,15 @@ const ProfileSettings = () => {
     first_name: '',
     last_name: '',
     phone: '',
-    location: ''
+    location: '',
+    address_line_1: '',
+    address_line_2: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: 'United States',
+    latitude: null as number | null,
+    longitude: null as number | null
   });
 
   // Load existing profile data
@@ -42,7 +50,15 @@ const ProfileSettings = () => {
             first_name: data.first_name || '',
             last_name: data.last_name || '',
             phone: data.phone || '',
-            location: data.location || ''
+            location: data.location || '',
+            address_line_1: data.address_line_1 || '',
+            address_line_2: data.address_line_2 || '',
+            city: data.city || '',
+            state: data.state || '',
+            postal_code: data.postal_code || '',
+            country: data.country || 'United States',
+            latitude: data.latitude || null,
+            longitude: data.longitude || null
           });
         }
       } catch (error) {
@@ -53,7 +69,7 @@ const ProfileSettings = () => {
     loadProfile();
   }, [user?.id]);
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | number | null) => {
     setProfileData(prev => ({
       ...prev,
       [field]: value
@@ -73,13 +89,26 @@ const ProfileSettings = () => {
     setLoading(true);
     
     try {
+      const profilePayload = {
+        id: user.id,
+        first_name: profileData.first_name,
+        last_name: profileData.last_name,
+        phone: profileData.phone,
+        location: profileData.location,
+        address_line_1: profileData.address_line_1,
+        address_line_2: profileData.address_line_2,
+        city: profileData.city,
+        state: profileData.state,
+        postal_code: profileData.postal_code,
+        country: profileData.country,
+        latitude: profileData.latitude,
+        longitude: profileData.longitude,
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await supabase
         .from('profiles')
-        .upsert({
-          id: user.id,
-          ...profileData,
-          updated_at: new Date().toISOString()
-        });
+        .upsert(profilePayload);
 
       if (error) {
         throw error;
@@ -187,8 +216,114 @@ const ProfileSettings = () => {
                 id="location"
                 value={profileData.location}
                 onChange={(e) => handleInputChange('location', e.target.value)}
-                placeholder="Enter your address or location"
+                placeholder="Enter your general address or location"
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Detailed Address Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              Detailed Address
+            </CardTitle>
+            <CardDescription>
+              Provide your complete address for service delivery
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="address_line_1">Address Line 1</Label>
+              <Input
+                id="address_line_1"
+                value={profileData.address_line_1}
+                onChange={(e) => handleInputChange('address_line_1', e.target.value)}
+                placeholder="Street address, P.O. box, company name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address_line_2">Address Line 2 (Optional)</Label>
+              <Input
+                id="address_line_2"
+                value={profileData.address_line_2}
+                onChange={(e) => handleInputChange('address_line_2', e.target.value)}
+                placeholder="Apartment, suite, unit, building, floor"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City / District</Label>
+                <Input
+                  id="city"
+                  value={profileData.city}
+                  onChange={(e) => handleInputChange('city', e.target.value)}
+                  placeholder="Enter city or district"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State / Province</Label>
+                <Input
+                  id="state"
+                  value={profileData.state}
+                  onChange={(e) => handleInputChange('state', e.target.value)}
+                  placeholder="Enter state or province"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="postal_code">Postal Code</Label>
+                <Input
+                  id="postal_code"
+                  value={profileData.postal_code}
+                  onChange={(e) => handleInputChange('postal_code', e.target.value)}
+                  placeholder="Enter postal/ZIP code"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Input
+                  id="country"
+                  value={profileData.country}
+                  onChange={(e) => handleInputChange('country', e.target.value)}
+                  placeholder="Enter country"
+                />
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <Label className="text-sm font-medium text-muted-foreground mb-3 block">
+                Coordinates (Optional) - Click the icon to adjust location
+              </Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="latitude">Latitude</Label>
+                  <Input
+                    id="latitude"
+                    type="number"
+                    step="any"
+                    value={profileData.latitude || ''}
+                    onChange={(e) => handleInputChange('latitude', e.target.value ? parseFloat(e.target.value) : null)}
+                    placeholder="37.664652"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="longitude">Longitude</Label>
+                  <Input
+                    id="longitude"
+                    type="number"
+                    step="any"
+                    value={profileData.longitude || ''}
+                    onChange={(e) => handleInputChange('longitude', e.target.value ? parseFloat(e.target.value) : null)}
+                    placeholder="-121.8832341"
+                  />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

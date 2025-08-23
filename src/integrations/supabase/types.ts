@@ -453,36 +453,60 @@ export type Database = {
       }
       profiles: {
         Row: {
+          address_line_1: string | null
+          address_line_2: string | null
+          city: string | null
+          country: string | null
           created_at: string
           first_name: string | null
           gender: string | null
           id: string
           last_name: string | null
+          latitude: number | null
           location: string | null
+          longitude: number | null
           phone: string | null
+          postal_code: string | null
           role: Database["public"]["Enums"]["app_role"]
+          state: string | null
           updated_at: string
         }
         Insert: {
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           first_name?: string | null
           gender?: string | null
           id: string
           last_name?: string | null
+          latitude?: number | null
           location?: string | null
+          longitude?: number | null
           phone?: string | null
+          postal_code?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          state?: string | null
           updated_at?: string
         }
         Update: {
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           first_name?: string | null
           gender?: string | null
           id?: string
           last_name?: string | null
+          latitude?: number | null
           location?: string | null
+          longitude?: number | null
           phone?: string | null
+          postal_code?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          state?: string | null
           updated_at?: string
         }
         Relationships: []
