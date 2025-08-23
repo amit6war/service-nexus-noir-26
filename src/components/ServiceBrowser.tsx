@@ -11,11 +11,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useServices, Service } from '@/hooks/useServices';
 import { useCart } from '@/hooks/useCart';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/components/ui/use-toast';
 
 const ServiceBrowser = () => {
   const { services, loading } = useServices();
   const { addToCart } = useCart();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [priceRange, setPriceRange] = useState([0, 500]);
@@ -56,11 +58,16 @@ const ServiceBrowser = () => {
 
     if (success) {
       console.log('Service added to cart successfully');
+      toast({
+        title: 'Added to cart',
+        description: `${service.title} by ${service.provider_profile.business_name} was added.`,
+      });
     }
   };
 
   const handleViewProvider = (providerId: string) => {
-    navigate(`/provider-detail/${providerId}`);
+    // Fix route to match App.tsx: /provider-profile/:providerId
+    navigate(`/provider-profile/${providerId}`);
   };
 
   const clearFilters = () => {
