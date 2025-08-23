@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, Star, MapPin, Clock, Plus, ShoppingCart, Eye, SlidersHorizontal } from 'lucide-react';
+import { Search, Filter, Star, MapPin, Clock, Plus, ShoppingCart, Eye, SlidersHorizontal, Award } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -233,7 +233,15 @@ const ServiceBrowser = () => {
                 <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="text-lg">{service.title}</CardTitle>
-                    <CardDescription className="text-sm">
+                    <CardDescription className="text-sm flex items-center gap-2">
+                      {service.provider_profile?.portfolio_images &&
+                        service.provider_profile.portfolio_images.length > 0 && (
+                          <img
+                            src={service.provider_profile.portfolio_images[0]}
+                            alt={service.provider_profile.business_name}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                        )}
                       {service.provider_profile?.business_name}
                     </CardDescription>
                   </div>
@@ -268,6 +276,11 @@ const ServiceBrowser = () => {
                     <div className="flex items-center gap-1">
                       <Clock className="w-4 h-4 text-muted-foreground" />
                       <span>{service.duration_minutes}min</span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Award className="w-4 h-4 text-muted-foreground" />
+                      <span>{service.provider_profile?.years_experience || 0} yrs</span>
                     </div>
                   </div>
                   
