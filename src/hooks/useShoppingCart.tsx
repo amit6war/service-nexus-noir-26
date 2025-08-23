@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -60,7 +59,7 @@ export const useShoppingCart = () => {
     }
   }, [items, initialized]);
 
-  const addItem = useCallback((itemData: Omit<CartItem, 'id'>) => {
+  const addItem = useCallback((itemData: Omit<CartItem, 'id'>, onSuccess?: () => void) => {
     console.log('🛒 ADD ITEM CALLED with:', itemData);
     
     return new Promise<boolean>((resolve) => {
@@ -115,6 +114,12 @@ export const useShoppingCart = () => {
         });
 
         console.log('✅ ADD ITEM COMPLETED SUCCESSFULLY');
+        
+        // Call success callback if provided
+        if (onSuccess) {
+          setTimeout(onSuccess, 100);
+        }
+        
         resolve(true);
         return newItems;
       });

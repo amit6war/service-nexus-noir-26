@@ -20,7 +20,7 @@ const CustomerDashboard = () => {
   const [showCart, setShowCart] = useState(false);
   
   const { user, signOut } = useAuth();
-  const { services, loading, error } = useServices();
+  const { services, loading, error, silentRefresh } = useServices();
   const { itemCount, initialized } = useShoppingCart();
 
   console.log('🏠 CustomerDashboard render - cart itemCount:', itemCount, 'initialized:', initialized);
@@ -42,6 +42,10 @@ const CustomerDashboard = () => {
     setSelectedService(null);
     setSelectedProvider(null);
     setActiveTab('browse');
+    // Refresh services data after booking completion
+    if (silentRefresh) {
+      silentRefresh();
+    }
   };
 
   const handleSignOut = async () => {
@@ -271,6 +275,7 @@ const CustomerDashboard = () => {
                   setSelectedService(null);
                 }}
                 onBookService={handleBookingComplete}
+                onCartUpdate={silentRefresh}
               />
             )}
 

@@ -37,10 +37,12 @@ export const useServices = () => {
 
   console.log('[useServices] Hook initialized, loading:', loading);
 
-  const fetchServices = useCallback(async () => {
+  const fetchServices = useCallback(async (showLoadingState = true) => {
     try {
       console.log('[useServices] Starting to fetch services...');
-      setLoading(true);
+      if (showLoadingState) {
+        setLoading(true);
+      }
       setError(null);
       
       // Test connection first
@@ -77,7 +79,9 @@ export const useServices = () => {
       if (!rawServices || rawServices.length === 0) {
         console.log('[useServices] No services found, setting empty array');
         setServices([]);
-        setLoading(false);
+        if (showLoadingState) {
+          setLoading(false);
+        }
         return;
       }
 
@@ -106,7 +110,9 @@ export const useServices = () => {
           provider_id: service.provider_id,
         }));
         setServices(servicesWithoutProviders);
-        setLoading(false);
+        if (showLoadingState) {
+          setLoading(false);
+        }
         return;
       }
 
@@ -183,9 +189,17 @@ export const useServices = () => {
       console.error('[useServices] Setting error state:', errorMessage);
       setServices([]);
     } finally {
-      setLoading(false);
+      if (showLoadingState) {
+        setLoading(false);
+      }
     }
   }, []);
+
+  // Silent refresh function for background updates
+  const silentRefresh = useCallback(async () => {
+    console.log('[useServices] Performing silent refresh...');
+    await fetchServices(false);
+  }, [fetchServices]);
 
   useEffect(() => {
     console.log('[useServices] useEffect triggered, calling fetchServices');
@@ -196,6 +210,7 @@ export const useServices = () => {
     services, 
     loading, 
     error, 
-    refetch: fetchServices 
+    refetch: fetchServices,
+    silentRefresh
   };
 };
