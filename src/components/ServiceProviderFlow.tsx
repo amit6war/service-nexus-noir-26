@@ -12,12 +12,14 @@ interface ServiceProviderFlowProps {
   selectedService: Service | null;
   onBack: () => void;
   onBookService: (provider: any) => void;
+  onCartUpdate?: () => void;
 }
 
 const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
   selectedService,
   onBack,
-  onBookService
+  onBookService,
+  onCartUpdate
 }) => {
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
 
@@ -127,6 +129,10 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
     console.log('Booking completed successfully');
     setSelectedProvider(null);
     onBookService(selectedProvider);
+    // Trigger cart update if callback is provided
+    if (onCartUpdate) {
+      onCartUpdate();
+    }
   };
 
   const handleBookingClose = () => {

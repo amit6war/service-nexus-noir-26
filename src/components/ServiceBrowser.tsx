@@ -94,7 +94,7 @@ const ServiceBrowser = () => {
     return (
       <div className="flex flex-col items-center justify-center p-8 space-y-4">
         <p className="text-red-500">Error loading services: {error}</p>
-        <Button onClick={refetch} variant="outline">
+        <Button onClick={() => refetch()} variant="outline">
           Try Again
         </Button>
       </div>
