@@ -13,7 +13,7 @@ import AddressManager, { Address } from '@/components/AddressManager';
 import { supabase } from '@/integrations/supabase/client';
 
 const Checkout = () => {
-  const { items, getTotalPrice, clearCart } = useShoppingCart();
+  const { items, getTotalPrice } = useShoppingCart(); // Don't destructure clearCart here
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -88,8 +88,9 @@ const Checkout = () => {
 
       console.log('Redirecting to Stripe checkout...');
       
-      // Clear cart before redirecting to Stripe
-      clearCart();
+      // Store cart items in sessionStorage before redirecting (don't clear cart yet)
+      sessionStorage.setItem('pendingCheckoutItems', JSON.stringify(items));
+      sessionStorage.setItem('pendingCheckoutAddress', JSON.stringify(addressForCheckout));
       
       // Redirect to Stripe Checkout
       window.location.href = data.url;

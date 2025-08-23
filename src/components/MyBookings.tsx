@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, User, Download, Star, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
@@ -6,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useBookingsActions } from '@/hooks/useBookingsActions';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
@@ -20,26 +22,24 @@ interface Booking {
   special_instructions?: string;
   cancellation_reason?: string;
   created_at: string;
-  // Mock service and provider data - in real app these would be joined
-  service_title: string;
-  provider_name: string;
-  provider_rating: number;
+  provider_user_id: string;
 }
 
 const MyBookings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { markCompleted, confirmBooking, cancelBooking, loading: actionLoading } = useBookingsActions();
+  
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load bookings data
+  // Load bookings data from Supabase
   useEffect(() => {
     const loadBookings = async () => {
       if (!user?.id) return;
 
       try {
-        // In a real app, this would join with services and provider_profiles tables
-        // For now, we'll create mock data to demonstrate the functionality
+        setLoading(true);
         const { data, error } = await supabase
           .from('bookings')
           .select('*')
@@ -48,92 +48,96 @@ const MyBookings = () => {
 
         if (error) {
           console.error('Error loading bookings:', error);
-          // Create mock bookings for demo
-          createMockBookings();
+          toast({
+            title: 'Error',
+            description: 'Failed to load bookings. Please try again.',
+            variant: 'destructive'
+          });
           return;
         }
 
-        if (data && data.length > 0) {
-          // Transform real data with mock service/provider info
-          const transformedBookings = data.map(booking => ({
-            ...booking,
-            service_title: 'Home Cleaning Service',
-            provider_name: 'Elite Professional Services',
-            provider_rating: 4.8
-          }));
-          setBookings(transformedBookings);
-        } else {
-          // Create mock bookings for demo
-          createMockBookings();
-        }
+        setBookings(data || []);
       } catch (error) {
         console.error('Error loading bookings:', error);
-        createMockBookings();
+        toast({
+          title: 'Error',
+          description: 'Failed to load bookings. Please try again.',
+          variant: 'destructive'
+        });
       } finally {
         setLoading(false);
       }
     };
 
-    const createMockBookings = () => {
-      const mockBookings: Booking[] = [
-        {
-          id: '1',
-          booking_number: 'BK-2024-001',
-          service_date: '2024-01-15T10:00:00Z',
-          status: 'completed',
-          final_price: 120,
-          duration_minutes: 120,
-          service_address: '123 Main St, Anytown, AN 12345',
-          special_instructions: 'Please focus on the kitchen and bathrooms',
-          created_at: '2024-01-10T09:00:00Z',
-          service_title: 'Home Cleaning Service',
-          provider_name: 'Elite Professional Services',
-          provider_rating: 4.9
-        },
-        {
-          id: '2',
-          booking_number: 'BK-2024-002',
-          service_date: '2024-01-22T14:00:00Z',
-          status: 'pending',
-          final_price: 85,
-          duration_minutes: 90,
-          service_address: '123 Main St, Anytown, AN 12345',
-          created_at: '2024-01-18T11:30:00Z',
-          service_title: 'Plumbing Repair',
-          provider_name: 'Quick Fix Professionals',
-          provider_rating: 4.7
-        },
-        {
-          id: '3',
-          booking_number: 'BK-2024-003',
-          service_date: '2024-01-08T16:00:00Z',
-          status: 'cancelled',
-          final_price: 200,
-          duration_minutes: 180,
-          service_address: '123 Main St, Anytown, AN 12345',
-          cancellation_reason: 'Customer requested cancellation',
-          created_at: '2024-01-05T14:20:00Z',
-          service_title: 'Electrical Installation',
-          provider_name: 'Expert Care Team',
-          provider_rating: 4.6
-        }
-      ];
-      setBookings(mockBookings);
-    };
-
     loadBookings();
-  }, [user?.id]);
+
+    // Set up real-time updates for bookings
+    const channel = supabase
+      .channel('booking-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `customer_id=eq.${user?.id}`
+        },
+        () => {
+          loadBookings(); // Reload bookings when changes occur
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, toast]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
         return <Badge className="bg-green-500 text-white"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
+      case 'confirmed':
+        return <Badge className="bg-blue-500 text-white"><CheckCircle className="w-3 h-3 mr-1" />Confirmed</Badge>;
       case 'pending':
         return <Badge className="bg-yellow-500 text-white"><AlertCircle className="w-3 h-3 mr-1" />Pending</Badge>;
       case 'cancelled':
         return <Badge className="bg-red-500 text-white"><XCircle className="w-3 h-3 mr-1" />Cancelled</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const handleConfirmBooking = async (bookingId: string) => {
+    try {
+      await confirmBooking(bookingId);
+      // Reload bookings to show updated status
+      const { data } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('customer_id', user?.id)
+        .order('service_date', { ascending: false });
+      
+      if (data) setBookings(data);
+    } catch (error) {
+      console.error('Error confirming booking:', error);
+    }
+  };
+
+  const handleCancelBooking = async (bookingId: string) => {
+    const reason = prompt('Please provide a reason for cancellation (optional):');
+    try {
+      await cancelBooking(bookingId, reason || undefined);
+      // Reload bookings to show updated status
+      const { data } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('customer_id', user?.id)
+        .order('service_date', { ascending: false });
+      
+      if (data) setBookings(data);
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
     }
   };
 
@@ -183,7 +187,7 @@ const MyBookings = () => {
                 <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
-                      <span>{booking.service_title}</span>
+                      <span>Service Booking</span>
                       {getStatusBadge(booking.status)}
                     </CardTitle>
                     <CardDescription>
@@ -201,14 +205,6 @@ const MyBookings = () => {
                   {/* Service Details */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm">
-                        <User className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium">{booking.provider_name}</span>
-                        <div className="flex items-center gap-1">
-                          <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                          <span className="text-xs">{booking.provider_rating}</span>
-                        </div>
-                      </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="w-4 h-4" />
                         <span>{format(new Date(booking.service_date), 'PPP p')}</span>
@@ -229,13 +225,40 @@ const MyBookings = () => {
                           <div className="text-muted-foreground">{booking.special_instructions}</div>
                         </div>
                       )}
+                      {booking.cancellation_reason && (
+                        <div className="text-sm">
+                          <div className="font-medium text-foreground">Cancellation Reason:</div>
+                          <div className="text-muted-foreground text-red-600">{booking.cancellation_reason}</div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Actions */}
                   <div className="flex justify-between items-center pt-4 border-t border-border">
-                    <div className="text-sm text-muted-foreground">
-                      Service ID: {booking.id}
+                    <div className="flex gap-2">
+                      {booking.status === 'completed' && (
+                        <Button
+                          onClick={() => handleConfirmBooking(booking.id)}
+                          disabled={actionLoading}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Confirm Service
+                        </Button>
+                      )}
+                      {(booking.status === 'pending' || booking.status === 'completed') && (
+                        <Button
+                          onClick={() => handleCancelBooking(booking.id)}
+                          disabled={actionLoading}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Cancel Booking
+                        </Button>
+                      )}
                     </div>
                     <Button
                       onClick={() => handleDownloadInvoice(booking)}
