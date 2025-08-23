@@ -45,21 +45,7 @@ export const useServices = () => {
       // First fetch all active services
       const { data: servicesData, error: servicesError } = await supabase
         .from('services')
-        .select(`
-          id,
-          title,
-          description,
-          category,
-          subcategory,
-          base_price,
-          duration_minutes,
-          price_type,
-          images,
-          is_active,
-          is_featured,
-          emergency_available,
-          provider_id
-        `)
+        .select('*')
         .eq('is_active', true);
 
       if (servicesError) {
@@ -79,41 +65,39 @@ export const useServices = () => {
       const providerIds = [...new Set(servicesData.map(service => service.provider_id).filter(Boolean))];
       console.log('Provider IDs:', providerIds);
       
-      // Fetch provider profiles for these services (only if we have provider IDs)
-      let providersData: any[] | null = [];
-      if (providerIds.length > 0) {
-        const { data, error: providersError } = await supabase
-          .from('provider_profiles')
-          .select(`
-            user_id,
-            business_name,
-            rating,
-            total_reviews,
-            verification_status,
-            description,
-            years_experience,
-            portfolio_images
-          `)
-          .in('user_id', providerIds)
-          .eq('verification_status', 'approved');
-
-        if (providersError) {
-          console.error('Error fetching providers:', providersError);
-          // Continue without provider data rather than failing completely
-          providersData = [];
-        } else {
-          providersData = data || [];
-        }
+      if (providerIds.length === 0) {
+        console.log('No provider IDs found in services');
+        setServices([]);
+        return;
       }
 
+      // Fetch approved provider profiles
+      const { data: providersData, error: providersError } = await supabase
+        .from('provider_profiles')
+        .select('*')
+        .in('user_id', providerIds)
+        .eq('verification_status', 'approved');
+
+      if (providersError) {
+        console.error('Error fetching providers:', providersError);
+        throw providersError;
+      }
+
+      console.log('Providers data:', providersData);
+
+      if (!providersData || providersData.length === 0) {
+        console.log('No approved providers found');
+        setServices([]);
+        return;
+      }
 
       // Transform and combine the data
       const transformedServices = servicesData
         .map(service => {
-          const provider = providersData?.find(p => p.user_id === service.provider_id);
+          const provider = providersData.find(p => p.user_id === service.provider_id);
           
           if (!provider) {
-            console.log(`No approved provider found for service ${service.id}`);
+            console.log(`No approved provider found for service ${service.id} with provider_id ${service.provider_id}`);
             return null; // Skip services without approved providers
           }
 
@@ -143,7 +127,7 @@ export const useServices = () => {
             }
           };
         })
-        .filter(service => service !== null);
+        .filter(service => service !== null) as Service[];
       
       console.log('Final transformed services:', transformedServices);
       setServices(transformedServices);
