@@ -203,7 +203,7 @@ const Header: React.FC = () => {
                 Sign In
               </motion.button>
             )}
-          </div>
+          </motion.div>
         </div>
       </div>
     </header>
