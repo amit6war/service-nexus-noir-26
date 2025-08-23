@@ -50,7 +50,7 @@ export const useServices = () => {
           is_featured,
           emergency_available,
           provider_id,
-          provider_profiles!services_provider_id_fkey (
+          provider_profiles!provider_id (
             business_name,
             rating,
             total_reviews,
@@ -59,7 +59,7 @@ export const useServices = () => {
           )
         `)
         .eq('is_active', true)
-        .eq('provider_profiles.verification_status', 'verified');
+        .eq('provider_profiles.verification_status', 'approved');
 
       if (error) {
         console.error('Supabase error:', error);
