@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useServices } from '@/hooks/useServices';
-import { useCart } from '@/hooks/useCart';
+import { useShoppingCart } from '@/hooks/useShoppingCart';
 import ServiceProviderFlow from '@/components/ServiceProviderFlow';
-import CartSidebar from '@/components/CartSidebar';
+import CartSection from '@/components/CartSection';
 import ProfileSettings from '@/components/ProfileSettings';
 import MyBookings from '@/components/MyBookings';
 
@@ -20,7 +20,7 @@ const CustomerDashboard = () => {
   
   const { user, signOut } = useAuth();
   const { services, loading, error } = useServices();
-  const { cartItems, itemCount } = useCart();
+  const { itemCount } = useShoppingCart();
 
   const handleServiceSelect = (service) => {
     setSelectedService(service);
@@ -282,8 +282,8 @@ const CustomerDashboard = () => {
         </div>
       </div>
 
-      {/* Cart Sidebar */}
-      <CartSidebar isOpen={showCart} onClose={() => setShowCart(false)} />
+      {/* Cart Section */}
+      <CartSection isOpen={showCart} onClose={() => setShowCart(false)} />
     </div>
   );
 };

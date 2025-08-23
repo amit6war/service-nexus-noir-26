@@ -8,12 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useCart } from '@/hooks/useCart';
+import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 
 const Checkout = () => {
-  const { cartItems, removeFromCart, getTotalPrice, clearCart } = useCart();
+  const { items: cartItems, removeItem, getTotalPrice, clearCart } = useShoppingCart();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -242,7 +242,7 @@ const Checkout = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeFromCart(item.id)}
+                          onClick={() => removeItem(item.id)}
                           className="text-red-500 hover:text-red-700 h-8 w-8 p-0"
                         >
                           <Trash2 className="w-4 h-4" />

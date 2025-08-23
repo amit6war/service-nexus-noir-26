@@ -9,14 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useServices, Service } from '@/hooks/useServices';
-import { useCart } from '@/hooks/useCart';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import ServiceProviderFlow from './ServiceProviderFlow';
 
 const ServiceBrowser = () => {
   const { services, loading, error, refetch } = useServices();
-  const { addToCart } = useCart();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');

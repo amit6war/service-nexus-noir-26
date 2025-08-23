@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useCart } from '@/hooks/useCart';
+import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, isBefore, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -32,7 +32,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
   const [loading, setLoading] = useState(false);
   const [conflictError, setConflictError] = useState('');
   
-  const { addToCart } = useCart();
+  const { addItem } = useShoppingCart();
   const { toast } = useToast();
 
   console.log('BookingFlow rendered with:', { service: service?.title, provider: provider?.business_name });
@@ -112,7 +112,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
         special_instructions: specialInstructions
       });
 
-      const success = addToCart({
+      const success = addItem({
         service_id: service.id,
         provider_id: provider.user_id || provider.id,
         service_title: service.title,
