@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,7 +21,7 @@ export type Address = {
   address_line_2?: string;
   city?: string;
   state?: string;
-  postal_code?: string;
+  zip_code?: string; // Changed from postal_code to match checkout form
   country?: string;
 };
 
@@ -44,7 +43,7 @@ function formatServiceAddress(addr: Address) {
   const line2 = addr.address_line_2 ? `, ${addr.address_line_2}` : '';
   const city = addr.city ? `, ${addr.city}` : '';
   const state = addr.state ? `, ${addr.state}` : '';
-  const zip = addr.postal_code ? ` ${addr.postal_code}` : '';
+  const zip = addr.zip_code ? ` ${addr.zip_code}` : '';
   const country = addr.country ? `, ${addr.country}` : '';
   return `${addr.address_line_1}${line2}${city}${state}${zip}${country}`.trim();
 }
@@ -56,7 +55,7 @@ export const useBookingsActions = () => {
   const { toast } = useToast();
 
   const createBookingsFromCart = useMemo(() => {
-    return async (items: CartItem[], address: Address): Promise<CreatedBooking[]> => {
+    return async (items: CartItem[], address: Address): Promise<boolean> => {
       if (!items || items.length === 0) {
         throw new Error('No items to book.');
       }
@@ -76,34 +75,39 @@ export const useBookingsActions = () => {
         service_id: item.service_id,
         service_date: item.scheduled_date,
         duration_minutes: item.duration_minutes ?? null,
-        final_price: item.price, // numeric type in generated types accepts number
+        final_price: item.price,
         estimated_price: item.price,
         special_instructions: item.special_instructions || null,
         booking_number: generateBookingNumber(),
         service_address,
         service_city: address.city ?? null,
         service_state: address.state ?? null,
-        service_zip: address.postal_code ?? null,
+        service_zip: address.zip_code ?? null,
       }));
 
       setLoading(true);
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert(rows)
-        .select('id, booking_number, status, service_date, final_price');
+      try {
+        const { data, error } = await supabase
+          .from('bookings')
+          .insert(rows)
+          .select('id, booking_number, status, service_date, final_price');
 
-      setLoading(false);
+        if (error) {
+          throw new Error(error.message);
+        }
 
-      if (error) {
-        throw new Error(error.message);
+        toast({
+          title: 'Bookings created',
+          description: `${data?.length ?? 0} booking(s) added successfully.`,
+        });
+
+        return true;
+      } catch (error) {
+        console.error('Error creating bookings:', error);
+        throw error;
+      } finally {
+        setLoading(false);
       }
-
-      toast({
-        title: 'Bookings created',
-        description: `${data?.length ?? 0} booking(s) added successfully.`,
-      });
-
-      return (data ?? []) as unknown as CreatedBooking[];
     };
   }, [toast]);
 

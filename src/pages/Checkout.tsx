@@ -50,6 +50,17 @@ const Checkout = () => {
       return;
     }
 
+    // Validate that all items have scheduled dates
+    const itemsWithoutDate = items.filter(item => !item.scheduled_date);
+    if (itemsWithoutDate.length > 0) {
+      toast({
+        title: 'Missing Schedule',
+        description: 'All services must have a scheduled date before checkout.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
