@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, User, Trash2, ShoppingCart as CartIcon } from 'lucide-react';
@@ -36,112 +37,138 @@ const CartSection: React.FC<CartSectionProps> = ({ isOpen, onClose }) => {
             onClick={onClose}
           />
           
-          {/* Cart Sidebar */}
+          {/* Full Screen Cart Modal */}
           <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-            className="fixed right-0 top-0 h-full w-96 bg-background border-l shadow-xl z-50 overflow-hidden flex flex-col"
+            className="fixed inset-4 md:inset-8 lg:inset-16 bg-background border shadow-2xl z-50 overflow-hidden flex flex-col rounded-xl"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b">
-              <div className="flex items-center gap-3">
-                <CartIcon className="w-6 h-6 text-teal" />
-                <h2 className="text-xl font-bold">Your Cart</h2>
-                <Badge variant="secondary">{itemCount}</Badge>
+            <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-teal/5 to-teal/10">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-teal/10 rounded-full">
+                  <CartIcon className="w-6 h-6 text-teal" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">Your Shopping Cart</h2>
+                  <p className="text-muted-foreground">
+                    {itemCount === 0 ? 'No items' : `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`} in your cart
+                  </p>
+                </div>
+                <Badge variant="secondary" className="text-lg px-3 py-1">{itemCount}</Badge>
               </div>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="w-5 h-5" />
+              <Button variant="ghost" size="lg" onClick={onClose} className="h-12 w-12">
+                <X className="w-6 h-6" />
               </Button>
             </div>
 
             {/* Cart Content */}
             <div className="flex-1 overflow-y-auto">
               {itemCount === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-                  <CartIcon className="w-16 h-16 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Your cart is empty</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Add services to your cart to get started
+                <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                  <div className="p-6 bg-muted/30 rounded-full mb-6">
+                    <CartIcon className="w-16 h-16 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-2xl font-semibold mb-3">Your cart is empty</h3>
+                  <p className="text-muted-foreground mb-6 max-w-md">
+                    Discover amazing services from our trusted providers and add them to your cart to get started
                   </p>
-                  <Button onClick={onClose} className="bg-teal hover:bg-teal/90">
+                  <Button onClick={onClose} className="bg-teal hover:bg-teal/90 px-8 py-3">
                     Browse Services
                   </Button>
                 </div>
               ) : (
-                <div className="p-4 space-y-4">
-                  {items.map((item, index) => (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <CardTitle className="text-lg">{item.service_title}</CardTitle>
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                                <User className="w-3 h-3" />
-                                <span>{item.provider_name}</span>
+                <div className="p-6">
+                  <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+                    {items.map((item, index) => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <Card className="h-full hover:shadow-lg transition-shadow">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <CardTitle className="text-xl mb-2">{item.service_title}</CardTitle>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <User className="w-4 h-4" />
+                                  <span>{item.provider_name}</span>
+                                </div>
                               </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeItem(item.id)}
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50 h-10 w-10 p-0"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </Button>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeItem(item.id)}
-                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm">
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-muted-foreground" />
-                                <span>{item.duration_minutes} minutes</span>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Clock className="w-4 h-4" />
+                                  <span>{item.duration_minutes} minutes</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-2xl font-bold text-teal">${item.price}</span>
+                                </div>
                               </div>
-                              <span className="font-semibold text-teal">${item.price}</span>
+                              
+                              {item.scheduled_date && (
+                                <div className="p-3 bg-muted/30 rounded-lg">
+                                  <div className="text-sm">
+                                    <span className="font-medium text-foreground">Scheduled:</span>
+                                    <p className="text-muted-foreground mt-1">
+                                      {format(new Date(item.scheduled_date), 'PPP p')}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {item.special_instructions && (
+                                <div className="p-3 bg-muted/30 rounded-lg">
+                                  <div className="text-sm">
+                                    <span className="font-medium text-foreground">Special Instructions:</span>
+                                    <p className="text-muted-foreground mt-1">{item.special_instructions}</p>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            
-                            {item.scheduled_date && (
-                              <div className="text-sm text-muted-foreground">
-                                Scheduled: {format(new Date(item.scheduled_date), 'PPP p')}
-                              </div>
-                            )}
-                            
-                            {item.special_instructions && (
-                              <div className="text-sm">
-                                <span className="font-medium">Instructions:</span>
-                                <p className="text-muted-foreground mt-1">{item.special_instructions}</p>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Footer */}
             {itemCount > 0 && (
-              <div className="border-t p-6 bg-muted/30">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-semibold">Total:</span>
-                    <span className="text-xl font-bold text-teal">${getTotalPrice()}</span>
+              <div className="border-t bg-gradient-to-r from-muted/30 to-muted/10">
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <span className="text-sm text-muted-foreground">Total Amount</span>
+                      <div className="text-3xl font-bold text-teal">${getTotalPrice()}</div>
+                    </div>
+                    <div className="text-right text-sm text-muted-foreground">
+                      <p>{itemCount} {itemCount === 1 ? 'service' : 'services'} selected</p>
+                      <p>Ready for checkout</p>
+                    </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="flex gap-4">
                     <Button
                       onClick={handleProceedToCheckout}
-                      className="w-full bg-teal hover:bg-teal/90"
+                      className="flex-1 bg-teal hover:bg-teal/90 h-14 text-lg"
                       size="lg"
                     >
                       Proceed to Checkout
@@ -150,8 +177,8 @@ const CartSection: React.FC<CartSectionProps> = ({ isOpen, onClose }) => {
                     <Button
                       onClick={clearCart}
                       variant="outline"
-                      className="w-full"
-                      size="sm"
+                      className="px-6 h-14"
+                      size="lg"
                     >
                       Clear Cart
                     </Button>

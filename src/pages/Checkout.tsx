@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
+import AddressManager, { Address } from '@/components/AddressManager';
 
 const Checkout = () => {
   const { items: cartItems, removeItem, getTotalPrice, clearCart } = useShoppingCart();
@@ -19,11 +20,15 @@ const Checkout = () => {
   const [loading, setLoading] = useState(false);
   
   // Form states
-  const [serviceAddress, setServiceAddress] = useState('');
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [serviceDate, setServiceDate] = useState('');
   const [serviceTime, setServiceTime] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('card');
+
+  const handleAddressSelect = (address: Address) => {
+    setSelectedAddress(address);
+  };
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
@@ -35,10 +40,10 @@ const Checkout = () => {
       return;
     }
 
-    if (!serviceAddress || !serviceDate || !serviceTime) {
+    if (!selectedAddress || !serviceDate || !serviceTime) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields",
+        description: "Please select an address and fill in all required fields",
         variant: "destructive"
       });
       return;
@@ -120,25 +125,44 @@ const Checkout = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Address Selection */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="w-5 h-5" />
+                  Service Address
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AddressManager 
+                  onAddressSelect={handleAddressSelect}
+                  selectedAddressId={selectedAddress?.id}
+                  showSelection={true}
+                />
+                {selectedAddress && (
+                  <div className="mt-4 p-4 bg-teal/5 border border-teal/20 rounded-lg">
+                    <h4 className="font-medium text-teal mb-2">Selected Address:</h4>
+                    <p className="text-sm">
+                      {selectedAddress.address_line_1}
+                      {selectedAddress.address_line_2 && `, ${selectedAddress.address_line_2}`}
+                    </p>
+                    <p className="text-sm">
+                      {selectedAddress.city}, {selectedAddress.state} {selectedAddress.postal_code}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Service Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
                   Service Details
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Service Address *
-                  </label>
-                  <Input
-                    placeholder="Enter the address where service will be provided"
-                    value={serviceAddress}
-                    onChange={(e) => setServiceAddress(e.target.value)}
-                  />
-                </div>
-                
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1">
@@ -177,6 +201,7 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
+            {/* Payment Method */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -277,7 +302,7 @@ const Checkout = () => {
 
             <Button
               onClick={handleCheckout}
-              disabled={loading}
+              disabled={loading || !selectedAddress}
               className="w-full bg-teal hover:bg-teal/90 h-12"
             >
               {loading ? (
