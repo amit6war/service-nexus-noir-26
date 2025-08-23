@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, Star, MapPin, Clock, Plus, ShoppingCart, Eye, SlidersHorizontal, Award } from 'lucide-react';
+import { Search, Filter, Star, MapPin, Clock, Plus, ShoppingCart, Eye, SlidersHorizontal, Award, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +12,10 @@ import { useServices, Service } from '@/hooks/useServices';
 import { useCart } from '@/hooks/useCart';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
+import ServiceProviderFlow from './ServiceProviderFlow';
 
 const ServiceBrowser = () => {
-  const { services, loading } = useServices();
+  const { services, loading, error, refetch } = useServices();
   const { addToCart } = useCart();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -25,6 +26,7 @@ const ServiceBrowser = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [emergencyOnly, setEmergencyOnly] = useState(false);
   const [featuredOnly, setFeaturedOnly] = useState(false);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
 
   const filteredServices = services.filter(service => {
     const matchesSearch = service.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -65,9 +67,17 @@ const ServiceBrowser = () => {
     }
   };
 
-  const handleViewProvider = (providerId: string) => {
-    // Fix route to match App.tsx: /provider-profile/:providerId
-    navigate(`/provider-profile/${providerId}`);
+  const handleViewProviders = (service: Service) => {
+    setSelectedService(service);
+  };
+
+  const handleBookService = (providerId: string, service: Service) => {
+    // Navigate to checkout or booking page
+    navigate('/checkout');
+    toast({
+      title: 'Booking initiated',
+      description: `Booking ${service.title} with ${service.provider_profile?.business_name}`,
+    });
   };
 
   const clearFilters = () => {
@@ -79,6 +89,18 @@ const ServiceBrowser = () => {
     setFeaturedOnly(false);
   };
 
+  // Show service provider flow if a service is selected
+  if (selectedService) {
+    return (
+      <ServiceProviderFlow
+        selectedService={selectedService}
+        onBack={() => setSelectedService(null)}
+        onBookService={handleBookService}
+      />
+    );
+  }
+
+  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -87,6 +109,19 @@ const ServiceBrowser = () => {
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
           className="w-8 h-8 border-2 border-teal border-t-transparent rounded-full"
         />
+        <span className="ml-3 text-muted-foreground">Loading services...</span>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+        <p className="text-red-500">Error loading services: {error}</p>
+        <Button onClick={refetch} variant="outline">
+          Try Again
+        </Button>
       </div>
     );
   }
@@ -297,19 +332,19 @@ const ServiceBrowser = () => {
                   
                   <div className="flex gap-2 mt-4">
                     <Button
-                      onClick={() => handleViewProvider(service.provider_id!)}
-                      variant="outline"
+                      onClick={() => handleViewProviders(service)}
+                      className="bg-teal hover:bg-teal/90 flex-1"
                       size="sm"
-                      className="flex-1"
                     >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View Provider
+                      <Users className="w-4 h-4 mr-1" />
+                      View Providers
                     </Button>
                     
                     <Button
                       onClick={() => handleAddToCart(service)}
-                      className="bg-teal hover:bg-teal/90 flex-1"
+                      variant="outline"
                       size="sm"
+                      className="flex-1"
                     >
                       <Plus className="w-4 h-4 mr-1" />
                       Add to Cart

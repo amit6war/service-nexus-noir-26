@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -32,11 +32,15 @@ export interface Service {
 export const useServices = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchServices = async () => {
+  const fetchServices = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('Fetching services...');
       
       // First fetch all active services
       const { data: servicesData, error: servicesError } = await supabase
@@ -63,13 +67,17 @@ export const useServices = () => {
         throw servicesError;
       }
 
+      console.log('Services data:', servicesData);
+
       if (!servicesData || servicesData.length === 0) {
+        console.log('No services found');
         setServices([]);
         return;
       }
 
       // Get unique provider IDs
       const providerIds = [...new Set(servicesData.map(service => service.provider_id).filter(Boolean))];
+      console.log('Provider IDs:', providerIds);
       
       // Fetch provider profiles for these services
       const { data: providersData, error: providersError } = await supabase
@@ -92,12 +100,15 @@ export const useServices = () => {
         // Continue without provider data rather than failing completely
       }
 
+      console.log('Providers data:', providersData);
+
       // Transform and combine the data
       const transformedServices = servicesData
         .map(service => {
           const provider = providersData?.find(p => p.user_id === service.provider_id);
           
           if (!provider) {
+            console.log(`No approved provider found for service ${service.id}`);
             return null; // Skip services without approved providers
           }
 
@@ -129,10 +140,12 @@ export const useServices = () => {
         })
         .filter(service => service !== null);
       
-      console.log('Fetched services:', transformedServices);
+      console.log('Final transformed services:', transformedServices);
       setServices(transformedServices);
     } catch (error) {
       console.error('Error in fetchServices:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load services';
+      setError(errorMessage);
       toast({
         title: "Error",
         description: "Failed to load services. Please try again.",
@@ -142,11 +155,11 @@ export const useServices = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchServices();
-  }, []);
+  }, [fetchServices]);
 
-  return { services, loading, refetch: fetchServices };
+  return { services, loading, error, refetch: fetchServices };
 };
