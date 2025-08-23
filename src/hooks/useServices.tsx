@@ -35,123 +35,167 @@ export const useServices = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  console.log('useServices hook initialized, loading:', loading);
+  console.log('[useServices] Hook initialized, loading:', loading);
 
   const fetchServices = useCallback(async () => {
     try {
+      console.log('[useServices] Starting to fetch services...');
       setLoading(true);
       setError(null);
       
-      console.log('Fetching services...');
-      
-      // First fetch all active services
-      const { data: servicesData, error: servicesError } = await supabase
+      // Test connection first
+      const { data: testConnection } = await supabase.from('services').select('count', { count: 'exact', head: true });
+      console.log('[useServices] Connection test - service count:', testConnection);
+
+      // Fetch services with a simple query first
+      const { data: rawServices, error: servicesError } = await supabase
         .from('services')
-        .select('*')
+        .select(`
+          id,
+          title,
+          description,
+          category,
+          subcategory,
+          base_price,
+          duration_minutes,
+          price_type,
+          images,
+          is_active,
+          is_featured,
+          emergency_available,
+          provider_id
+        `)
         .eq('is_active', true);
 
+      console.log('[useServices] Raw services query result:', { rawServices, servicesError });
+
       if (servicesError) {
-        console.error('Error fetching services:', servicesError);
-        throw servicesError;
+        console.error('[useServices] Services query error:', servicesError);
+        throw new Error(`Failed to fetch services: ${servicesError.message}`);
       }
 
-      console.log('Services data:', servicesData);
-
-      if (!servicesData || servicesData.length === 0) {
-        console.log('No services found');
+      if (!rawServices || rawServices.length === 0) {
+        console.log('[useServices] No services found, setting empty array');
         setServices([]);
+        setLoading(false);
         return;
       }
+
+      console.log('[useServices] Found services:', rawServices.length);
 
       // Get unique provider IDs
-      const providerIds = [...new Set(servicesData.map(service => service.provider_id).filter(Boolean))];
-      console.log('Provider IDs:', providerIds);
-      
+      const providerIds = [...new Set(rawServices.map(service => service.provider_id).filter(Boolean))];
+      console.log('[useServices] Provider IDs to fetch:', providerIds);
+
       if (providerIds.length === 0) {
-        console.log('No provider IDs found in services');
-        setServices([]);
+        console.log('[useServices] No provider IDs found');
+        // Map services without provider info
+        const servicesWithoutProviders = rawServices.map(service => ({
+          id: service.id,
+          title: service.title || 'Untitled Service',
+          description: service.description || '',
+          category: service.category || 'Other',
+          subcategory: service.subcategory,
+          base_price: service.base_price || 0,
+          duration_minutes: service.duration_minutes || 30,
+          price_type: service.price_type || 'fixed',
+          images: service.images || [],
+          is_active: service.is_active || false,
+          is_featured: service.is_featured || false,
+          emergency_available: service.emergency_available || false,
+          provider_id: service.provider_id,
+        }));
+        setServices(servicesWithoutProviders);
+        setLoading(false);
         return;
       }
 
-      // Fetch approved provider profiles
-      const { data: providersData, error: providersError } = await supabase
+      // Fetch provider profiles
+      const { data: providers, error: providersError } = await supabase
         .from('provider_profiles')
-        .select('*')
-        .in('user_id', providerIds)
-        .eq('verification_status', 'approved');
+        .select(`
+          user_id,
+          business_name,
+          rating,
+          total_reviews,
+          verification_status,
+          description,
+          years_experience,
+          portfolio_images
+        `)
+        .in('user_id', providerIds);
+
+      console.log('[useServices] Provider profiles query result:', { providers, providersError });
 
       if (providersError) {
-        console.error('Error fetching providers:', providersError);
-        throw providersError;
+        console.error('[useServices] Provider profiles query error:', providersError);
+        // Continue without provider info
       }
 
-      console.log('Providers data:', providersData);
+      // Combine services with provider data
+      const combinedServices = rawServices.map(service => {
+        const provider = providers?.find(p => p.user_id === service.provider_id);
+        
+        const baseService = {
+          id: service.id,
+          title: service.title || 'Untitled Service',
+          description: service.description || '',
+          category: service.category || 'Other',
+          subcategory: service.subcategory,
+          base_price: service.base_price || 0,
+          duration_minutes: service.duration_minutes || 30,
+          price_type: service.price_type || 'fixed',
+          images: service.images || [],
+          is_active: service.is_active || false,
+          is_featured: service.is_featured || false,
+          emergency_available: service.emergency_available || false,
+          provider_id: service.provider_id,
+        };
 
-      if (!providersData || providersData.length === 0) {
-        console.log('No approved providers found');
-        setServices([]);
-        return;
-      }
-
-      // Transform and combine the data
-      const transformedServices = servicesData
-        .map(service => {
-          const provider = providersData.find(p => p.user_id === service.provider_id);
-          
-          if (!provider) {
-            console.log(`No approved provider found for service ${service.id} with provider_id ${service.provider_id}`);
-            return null; // Skip services without approved providers
-          }
-
+        if (provider) {
           return {
-            id: service.id,
-            title: service.title,
-            description: service.description || '',
-            category: service.category,
-            subcategory: service.subcategory || undefined,
-            base_price: service.base_price || 0,
-            duration_minutes: service.duration_minutes || 30,
-            price_type: service.price_type || 'fixed',
-            images: service.images || [],
-            is_active: service.is_active,
-            is_featured: service.is_featured || false,
-            emergency_available: service.emergency_available || false,
-            provider_id: service.provider_id,
+            ...baseService,
             provider_profile: {
               business_name: provider.business_name || 'Unknown Provider',
               rating: provider.rating || 0,
               total_reviews: provider.total_reviews || 0,
               user_id: provider.user_id,
-              verification_status: provider.verification_status,
+              verification_status: provider.verification_status || 'pending',
               description: provider.description,
               years_experience: provider.years_experience,
               portfolio_images: provider.portfolio_images || []
             }
           };
-        })
-        .filter(service => service !== null) as Service[];
+        }
+
+        return baseService;
+      });
+
+      console.log('[useServices] Final combined services:', combinedServices.length);
+      setServices(combinedServices);
       
-      console.log('Final transformed services:', transformedServices);
-      setServices(transformedServices);
     } catch (error) {
-      console.error('Error in fetchServices:', error);
+      console.error('[useServices] Error in fetchServices:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load services';
       setError(errorMessage);
-      toast({
-        title: "Error",
-        description: "Failed to load services. Please try again.",
-        variant: "destructive"
-      });
+      
+      // Don't show toast for now to avoid spam
+      console.error('[useServices] Setting error state:', errorMessage);
       setServices([]);
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
-    console.log('useEffect triggered, calling fetchServices');
+    console.log('[useServices] useEffect triggered, calling fetchServices');
     fetchServices();
   }, [fetchServices]);
 
-  return { services, loading, error, refetch: fetchServices };
+  return { 
+    services, 
+    loading, 
+    error, 
+    refetch: fetchServices 
+  };
 };

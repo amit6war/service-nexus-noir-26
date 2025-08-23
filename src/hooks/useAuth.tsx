@@ -37,7 +37,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const [profileRole, setProfileRole] = useState<AppRole | null>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastActivityRef = useRef<number>(Date.now());
+
+  console.log('[Auth] Current state:', { user: user?.id, session: session?.access_token ? 'exists' : 'none', loading, profileRole });
 
   // Helper to load role from profiles
   const loadProfileRole = async (userId: string | undefined | null) => {
@@ -57,7 +58,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (error) {
         console.warn('[Auth] Failed to fetch profile role:', error.message);
-        setProfileRole(null);
+        setProfileRole('customer'); // Default to customer if no profile found
         return;
       }
 
@@ -66,12 +67,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         console.log('[Auth] Profile role detected:', role);
         setProfileRole(role);
       } else {
-        console.log('[Auth] No role found in profile');
-        setProfileRole(null);
+        console.log('[Auth] No role found in profile, defaulting to customer');
+        setProfileRole('customer');
       }
     } catch (error) {
       console.error('[Auth] Error loading profile role:', error);
-      setProfileRole(null);
+      setProfileRole('customer');
     }
   };
 
@@ -88,13 +89,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Reset inactivity timer
   const resetInactivityTimer = useCallback(() => {
-    lastActivityRef.current = Date.now();
-    
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
     }
     
-    // Only set timer if user is logged in
     if (user) {
       inactivityTimerRef.current = setTimeout(() => {
         handleAutoLogout();
@@ -112,15 +110,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       resetInactivityTimer();
     };
 
-    // Add event listeners
     events.forEach(event => {
       document.addEventListener(event, resetTimer, true);
     });
 
-    // Start the timer
     resetInactivityTimer();
 
-    // Cleanup
     return () => {
       events.forEach(event => {
         document.removeEventListener(event, resetTimer, true);
@@ -132,20 +127,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [user, resetInactivityTimer]);
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+        
         console.log('[Auth] Auth state changed:', event, session?.user?.id);
+        
         setSession(session);
         const nextUser = session?.user ?? null;
         setUser(nextUser);
         
         // Load the role from profiles when auth state changes
-        if (nextUser) {
-          await loadProfileRole(nextUser.id);
+        if (nextUser && session) {
+          setTimeout(() => {
+            if (mounted) {
+              loadProfileRole(nextUser.id);
+            }
+          }, 0);
         } else {
           setProfileRole(null);
-          // Clear inactivity timer when user logs out
           if (inactivityTimerRef.current) {
             clearTimeout(inactivityTimerRef.current);
             inactivityTimerRef.current = null;
@@ -157,23 +160,49 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('[Auth] Initial session check:', session?.user?.id);
-      setSession(session);
-      const nextUser = session?.user ?? null;
-      setUser(nextUser);
-      
-      // Load the role from profiles on initial load
-      if (nextUser) {
-        await loadProfileRole(nextUser.id);
-      } else {
-        setProfileRole(null);
-      }
-      
-      setLoading(false);
-    });
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('[Auth] Error getting session:', error);
+          setLoading(false);
+          return;
+        }
 
-    return () => subscription.unsubscribe();
+        console.log('[Auth] Initial session check:', session?.user?.id);
+        
+        if (mounted) {
+          setSession(session);
+          const nextUser = session?.user ?? null;
+          setUser(nextUser);
+          
+          if (nextUser && session) {
+            setTimeout(() => {
+              if (mounted) {
+                loadProfileRole(nextUser.id);
+              }
+            }, 0);
+          } else {
+            setProfileRole(null);
+          }
+          
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('[Auth] Error initializing auth:', error);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, userData?: any, role: AppRole = 'customer') => {
@@ -181,7 +210,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     
     const redirectUrl = `${window.location.origin}/`;
     
-    // Prepare user metadata with role information
     const signupData = {
       email,
       password,
@@ -189,7 +217,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         emailRedirectTo: redirectUrl,
         data: {
           ...userData,
-          role: role // Include role in user metadata
+          role: role
         }
       }
     };
@@ -206,7 +234,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } else {
       console.log('[Auth] Signup successful:', data);
       
-      // If user is created immediately (not pending email confirmation)
       if (data.user && !data.user.email_confirmed_at) {
         toast({
           title: "Success",
@@ -231,7 +258,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       let errorMessage = error.message;
       
-      // Provide more user-friendly error messages
       if (error.message.includes('Email not confirmed')) {
         errorMessage = "Please check your email and click the confirmation link before signing in.";
       } else if (error.message.includes('Invalid login credentials')) {
@@ -245,7 +271,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
     } else {
       console.log('[Auth] Signin successful:', data);
-      // Role loading will be handled by the auth state change listener
     }
 
     return { error };
@@ -254,33 +279,42 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const signOut = async () => {
     console.log('[Auth] Starting signout process');
     
-    // Clear inactivity timer before signing out
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-      inactivityTimerRef.current = null;
-    }
-    
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      console.error('[Auth] Signout error:', error);
-      toast({
-        title: "Sign Out Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      // Clear local state
-      setProfileRole(null);
+    try {
+      // Clear inactivity timer
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+      
+      // Clear local state immediately
       setUser(null);
       setSession(null);
+      setProfileRole(null);
+      
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('[Auth] Signout error:', error);
+        toast({
+          title: "Sign Out Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return { error };
+      }
+      
       console.log('[Auth] Signout successful');
       
-      // Navigate to home page after successful logout
+      // Force reload to clear all state and redirect to home
       window.location.href = '/';
+      
+      return { error: null };
+    } catch (error) {
+      console.error('[Auth] Signout exception:', error);
+      // Force reload even on error to clear state
+      window.location.href = '/';
+      return { error };
     }
-
-    return { error };
   };
 
   const value = {

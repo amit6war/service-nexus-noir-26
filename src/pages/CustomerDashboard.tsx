@@ -38,7 +38,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ServiceBrowser from '@/components/ServiceBrowser';
-import TestServiceFetch from '@/components/TestServiceFetch';
 import CartSidebar from '@/components/CartSidebar';
 import { useCart } from '@/hooks/useCart';
 
@@ -72,7 +71,7 @@ interface PaymentHistory {
 }
 
 const CustomerDashboard = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { itemCount } = useCart();
@@ -84,11 +83,18 @@ const CustomerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
 
+  // Redirect to auth if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      console.log('[CustomerDashboard] No user found, redirecting to auth');
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
+
   // Mock data for demonstration
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
-        // Mock service requests
         setServiceRequests([
           {
             id: '1',
@@ -110,7 +116,6 @@ const CustomerDashboard = () => {
           }
         ]);
 
-        // Mock favorite providers
         setFavoriteProviders([
           {
             id: '1',
@@ -128,7 +133,6 @@ const CustomerDashboard = () => {
           }
         ]);
 
-        // Mock payment history
         setPaymentHistory([
           {
             id: '1',
@@ -153,12 +157,22 @@ const CustomerDashboard = () => {
       }
     };
 
-    loadDashboardData();
-  }, []);
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/auth');
+    console.log('[CustomerDashboard] Sign out clicked');
+    try {
+      const { error } = await signOut();
+      if (!error) {
+        console.log('[CustomerDashboard] Sign out successful');
+        navigate('/');
+      }
+    } catch (error) {
+      console.error('[CustomerDashboard] Sign out failed:', error);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -195,6 +209,23 @@ const CustomerDashboard = () => {
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'help', label: 'Help & Support', icon: HelpCircle },
   ];
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-navy flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-8 h-8 border-2 border-teal border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
+
+  // Don't render if no user
+  if (!user) {
+    return null;
+  }
 
   if (loading) {
     return (
@@ -528,10 +559,7 @@ const CustomerDashboard = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
               >
-                <TestServiceFetch />
-                <div className="mt-6">
-                  <ServiceBrowser />
-                </div>
+                <ServiceBrowser />
               </motion.div>
             )}
 
