@@ -49,46 +49,68 @@ export const useServices = () => {
           is_active,
           is_featured,
           emergency_available,
-          provider_id,
-          provider_profiles!provider_id (
-            business_name,
-            rating,
-            total_reviews,
-            user_id,
-            verification_status
-          )
+          provider_id
         `)
-        .eq('is_active', true)
-        .eq('provider_profiles.verification_status', 'approved');
+        .eq('is_active', true);
 
       if (error) {
         console.error('Supabase error:', error);
         throw error;
       }
 
+      // Fetch provider profiles separately for active services
+      const providerIds = data?.map(service => service.provider_id).filter(Boolean) || [];
+      
+      let providerProfiles: any[] = [];
+      if (providerIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('provider_profiles')
+          .select(`
+            user_id,
+            business_name,
+            rating,
+            total_reviews,
+            verification_status
+          `)
+          .in('user_id', providerIds)
+          .eq('verification_status', 'approved');
+
+        if (profilesError) {
+          console.error('Error fetching provider profiles:', profilesError);
+        } else {
+          providerProfiles = profilesData || [];
+        }
+      }
+
       // Transform the data to match our Service interface
-      const transformedServices: Service[] = (data || []).map(service => ({
-        id: service.id,
-        title: service.title,
-        description: service.description || '',
-        category: service.category,
-        subcategory: service.subcategory,
-        base_price: service.base_price || 0,
-        duration_minutes: service.duration_minutes || 0,
-        price_type: service.price_type || 'fixed',
-        images: service.images || [],
-        is_active: service.is_active,
-        is_featured: service.is_featured || false,
-        emergency_available: service.emergency_available || false,
-        provider_id: service.provider_id,
-        provider_profile: service.provider_profiles ? {
-          business_name: service.provider_profiles.business_name || '',
-          rating: service.provider_profiles.rating || 0,
-          total_reviews: service.provider_profiles.total_reviews || 0,
-          user_id: service.provider_profiles.user_id,
-          verification_status: service.provider_profiles.verification_status
-        } : undefined
-      }));
+      const transformedServices: Service[] = (data || []).map(service => {
+        const providerProfile = providerProfiles.find(
+          profile => profile.user_id === service.provider_id
+        );
+
+        return {
+          id: service.id,
+          title: service.title,
+          description: service.description || '',
+          category: service.category,
+          subcategory: service.subcategory,
+          base_price: service.base_price || 0,
+          duration_minutes: service.duration_minutes || 0,
+          price_type: service.price_type || 'fixed',
+          images: service.images || [],
+          is_active: service.is_active,
+          is_featured: service.is_featured || false,
+          emergency_available: service.emergency_available || false,
+          provider_id: service.provider_id,
+          provider_profile: providerProfile ? {
+            business_name: providerProfile.business_name || '',
+            rating: providerProfile.rating || 0,
+            total_reviews: providerProfile.total_reviews || 0,
+            user_id: providerProfile.user_id,
+            verification_status: providerProfile.verification_status
+          } : undefined
+        };
+      }).filter(service => service.provider_profile); // Only include services with approved providers
       
       setServices(transformedServices);
     } catch (error) {
