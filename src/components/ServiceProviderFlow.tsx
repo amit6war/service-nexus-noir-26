@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Star, Clock, MapPin, Calendar, User, Award } from 'lucide-react';
@@ -6,8 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Service } from '@/hooks/useServices';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 interface ServiceProviderFlowProps {
   selectedService: Service | null;
@@ -22,7 +25,11 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
 }) => {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
+  const [selectedDateTime, setSelectedDateTime] = useState<string>('');
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
 
   if (!selectedService) return null;
 
@@ -31,8 +38,35 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
     setShowBookingModal(true);
   };
 
-  const handleConfirmBooking = () => {
-    onBookService(selectedProvider?.user_id, selectedService);
+  const handleConfirmBooking = async () => {
+    if (!selectedProvider?.user_id || !user?.id) {
+      toast({ title: 'Error', description: 'Missing user or provider information.', variant: 'destructive' });
+      return;
+    }
+    if (!selectedDateTime) {
+      toast({ title: 'Select date & time', description: 'Please choose a date and time for your booking.' });
+      return;
+    }
+
+    const bookingNumber = `BK-${Date.now()}`;
+    const { error } = await supabase.from('bookings').insert({
+      customer_id: user.id,
+      provider_user_id: selectedProvider.user_id,
+      service_id: selectedService!.id,
+      service_date: new Date(selectedDateTime).toISOString(),
+      service_address: 'To be provided',
+      booking_number: bookingNumber,
+      duration_minutes: selectedService!.duration_minutes,
+      is_emergency: selectedService!.emergency_available || false,
+    });
+
+    if (error) {
+      console.error('Booking error:', error);
+      toast({ title: 'Booking failed', description: 'Could not create booking. Please try again.', variant: 'destructive' });
+      return;
+    }
+
+    toast({ title: 'Booking confirmed', description: `${selectedService!.title} with ${selectedProvider.business_name}` });
     setShowBookingModal(false);
     setSelectedProvider(null);
   };
@@ -205,6 +239,15 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
                   </span>
                 </div>
               </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Date & Time</label>
+              <Input
+                type="datetime-local"
+                value={selectedDateTime}
+                onChange={(e) => setSelectedDateTime(e.target.value)}
+              />
             </div>
             
             <div className="flex gap-3">

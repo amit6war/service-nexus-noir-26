@@ -328,6 +328,12 @@ const ServiceBrowser = () => {
                         {service.price_type === 'hourly' ? '/hr' : ''}
                       </span>
                     </div>
+                    {service.provider_profile && (
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Users className="w-4 h-4" />
+                        <span>1 provider</span>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="flex gap-2 mt-4">

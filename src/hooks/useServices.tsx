@@ -79,28 +79,33 @@ export const useServices = () => {
       const providerIds = [...new Set(servicesData.map(service => service.provider_id).filter(Boolean))];
       console.log('Provider IDs:', providerIds);
       
-      // Fetch provider profiles for these services
-      const { data: providersData, error: providersError } = await supabase
-        .from('provider_profiles')
-        .select(`
-          user_id,
-          business_name,
-          rating,
-          total_reviews,
-          verification_status,
-          description,
-          years_experience,
-          portfolio_images
-        `)
-        .in('user_id', providerIds)
-        .eq('verification_status', 'approved');
+      // Fetch provider profiles for these services (only if we have provider IDs)
+      let providersData: any[] | null = [];
+      if (providerIds.length > 0) {
+        const { data, error: providersError } = await supabase
+          .from('provider_profiles')
+          .select(`
+            user_id,
+            business_name,
+            rating,
+            total_reviews,
+            verification_status,
+            description,
+            years_experience,
+            portfolio_images
+          `)
+          .in('user_id', providerIds)
+          .eq('verification_status', 'approved');
 
-      if (providersError) {
-        console.error('Error fetching providers:', providersError);
-        // Continue without provider data rather than failing completely
+        if (providersError) {
+          console.error('Error fetching providers:', providersError);
+          // Continue without provider data rather than failing completely
+          providersData = [];
+        } else {
+          providersData = data || [];
+        }
       }
 
-      console.log('Providers data:', providersData);
 
       // Transform and combine the data
       const transformedServices = servicesData
