@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 export interface CartItem {
   id: string;
@@ -22,7 +22,12 @@ export const useCart = () => {
   useEffect(() => {
     const savedCart = localStorage.getItem('servicenexus_cart');
     if (savedCart) {
-      setCartItems(JSON.parse(savedCart));
+      try {
+        setCartItems(JSON.parse(savedCart));
+      } catch (error) {
+        console.error('Error loading cart from localStorage:', error);
+        localStorage.removeItem('servicenexus_cart');
+      }
     }
   }, []);
 
@@ -32,7 +37,7 @@ export const useCart = () => {
   }, [cartItems]);
 
   const addToCart = (item: Omit<CartItem, 'id'>) => {
-    // Check if service with same provider already exists
+    // Check if service already exists with same provider (no duplicates allowed)
     const existingItem = cartItems.find(
       cartItem => cartItem.service_id === item.service_id && cartItem.provider_id === item.provider_id
     );
@@ -46,12 +51,12 @@ export const useCart = () => {
       return false;
     }
 
-    // Check if service already exists with different provider
+    // Check if service already exists with different provider (only one provider per service)
     const serviceExists = cartItems.find(cartItem => cartItem.service_id === item.service_id);
     if (serviceExists) {
       toast({
         title: "Service already selected",
-        description: "You can only select one provider per service type",
+        description: "You can only select one provider per service type. Remove the existing one first.",
         variant: "destructive"
       });
       return false;
@@ -59,7 +64,7 @@ export const useCart = () => {
 
     const newItem: CartItem = {
       ...item,
-      id: Date.now().toString()
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
     };
 
     setCartItems(prev => [...prev, newItem]);
@@ -78,21 +83,36 @@ export const useCart = () => {
     });
   };
 
+  const updateCartItem = (itemId: string, updates: Partial<CartItem>) => {
+    setCartItems(prev => prev.map(item => 
+      item.id === itemId ? { ...item, ...updates } : item
+    ));
+  };
+
   const clearCart = () => {
     setCartItems([]);
     localStorage.removeItem('servicenexus_cart');
+    toast({
+      title: "Cart cleared",
+      description: "All items have been removed from your cart",
+    });
   };
 
   const getTotalPrice = () => {
     return cartItems.reduce((total, item) => total + item.price, 0);
   };
 
+  const getItemCount = () => {
+    return cartItems.length;
+  };
+
   return {
     cartItems,
     addToCart,
     removeFromCart,
+    updateCartItem,
     clearCart,
     getTotalPrice,
-    itemCount: cartItems.length
+    itemCount: getItemCount()
   };
 };
