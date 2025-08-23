@@ -93,7 +93,7 @@ export const useServices = () => {
       }
 
       // Transform and combine the data
-      const transformedServices: Service[] = servicesData
+      const transformedServices = servicesData
         .map(service => {
           const provider = providersData?.find(p => p.user_id === service.provider_id);
           
@@ -127,7 +127,7 @@ export const useServices = () => {
             }
           };
         })
-        .filter((service): service is Service => service !== null);
+        .filter(service => service !== null);
       
       console.log('Fetched services:', transformedServices);
       setServices(transformedServices);
