@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, CreditCard, MapPin, Calendar, Clock, Trash2, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, CreditCard, MapPin, Trash2, ShoppingCart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,8 +21,6 @@ const Checkout = () => {
   
   // Form states
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-  const [serviceDate, setServiceDate] = useState('');
-  const [serviceTime, setServiceTime] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('card');
 
@@ -40,10 +38,10 @@ const Checkout = () => {
       return;
     }
 
-    if (!selectedAddress || !serviceDate || !serviceTime) {
+    if (!selectedAddress) {
       toast({
         title: "Missing Information",
-        description: "Please select an address and fill in all required fields",
+        description: "Please select an address",
         variant: "destructive"
       });
       return;
@@ -154,42 +152,15 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
-            {/* Service Details */}
+            {/* Special Instructions */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
-                  Service Details
-                </CardTitle>
+                <CardTitle>Additional Instructions</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">
-                      Preferred Date *
-                    </label>
-                    <Input
-                      type="date"
-                      value={serviceDate}
-                      onChange={(e) => setServiceDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">
-                      Preferred Time *
-                    </label>
-                    <Input
-                      type="time"
-                      value={serviceTime}
-                      onChange={(e) => setServiceTime(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
+              <CardContent>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">
-                    Special Instructions
+                    Special Instructions (Optional)
                   </label>
                   <Textarea
                     placeholder="Any special instructions or requirements..."
@@ -257,7 +228,6 @@ const Checkout = () => {
                         <p className="text-sm text-muted-foreground">{item.provider_name}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="outline" className="text-xs">
-                            <Clock className="w-3 h-3 mr-1" />
                             {item.duration_minutes}min
                           </Badge>
                         </div>
