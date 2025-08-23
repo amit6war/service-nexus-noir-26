@@ -114,7 +114,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
 
       console.log('🛒 Adding item to cart:', cartItem);
 
-      const success = addItem(cartItem);
+      const success = await addItem(cartItem);
 
       console.log('🛒 Add to cart result:', success);
 

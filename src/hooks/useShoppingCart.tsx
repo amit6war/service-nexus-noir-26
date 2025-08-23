@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 export interface CartItem {
@@ -20,6 +20,15 @@ export const useShoppingCart = () => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [initialized, setInitialized] = useState(false);
   const { toast } = useToast();
+  
+  // Use ref to track current items for duplicate checking
+  const itemsRef = useRef<CartItem[]>([]);
+
+  // Update ref whenever items change
+  useEffect(() => {
+    itemsRef.current = items;
+    console.log('🛒 Items ref updated:', items.length, 'items');
+  }, [items]);
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -59,57 +68,62 @@ export const useShoppingCart = () => {
   const addItem = useCallback((itemData: Omit<CartItem, 'id'>) => {
     console.log('🛒 ADD ITEM CALLED with:', itemData);
     
-    // Check if service already exists with same provider
-    const existingItem = items.find(
-      item => item.service_id === itemData.service_id && item.provider_id === itemData.provider_id
-    );
+    return new Promise<boolean>((resolve) => {
+      setItems(currentItems => {
+        console.log('🛒 Current items in state update:', currentItems.length);
+        
+        // Check if service already exists with same provider
+        const existingItem = currentItems.find(
+          item => item.service_id === itemData.service_id && item.provider_id === itemData.provider_id
+        );
 
-    if (existingItem) {
-      console.log('⚠️ Item already exists in cart');
-      toast({
-        title: "Already in cart",
-        description: "This service from this provider is already in your cart",
-        variant: "destructive"
+        if (existingItem) {
+          console.log('⚠️ Item already exists in cart');
+          toast({
+            title: "Already in cart",
+            description: "This service from this provider is already in your cart",
+            variant: "destructive"
+          });
+          resolve(false);
+          return currentItems;
+        }
+
+        // Check if service already exists with different provider
+        const serviceExists = currentItems.find(item => item.service_id === itemData.service_id);
+        if (serviceExists) {
+          console.log('⚠️ Service already exists with different provider');
+          toast({
+            title: "Service already selected",
+            description: "You can only select one provider per service type. Remove the existing one first.",
+            variant: "destructive"
+          });
+          resolve(false);
+          return currentItems;
+        }
+
+        // Create new item with unique ID
+        const newItem: CartItem = {
+          ...itemData,
+          id: `cart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        };
+
+        console.log('🛒 Creating new cart item:', newItem);
+
+        const newItems = [...currentItems, newItem];
+        console.log('✅ Cart state updated - total items:', newItems.length);
+        console.log('🛒 New cart contents:', newItems);
+
+        toast({
+          title: "Added to cart",
+          description: `${itemData.service_title} has been added to your cart`,
+        });
+
+        console.log('✅ ADD ITEM COMPLETED SUCCESSFULLY');
+        resolve(true);
+        return newItems;
       });
-      return false;
-    }
-
-    // Check if service already exists with different provider
-    const serviceExists = items.find(item => item.service_id === itemData.service_id);
-    if (serviceExists) {
-      console.log('⚠️ Service already exists with different provider');
-      toast({
-        title: "Service already selected",
-        description: "You can only select one provider per service type. Remove the existing one first.",
-        variant: "destructive"
-      });
-      return false;
-    }
-
-    // Create new item with unique ID
-    const newItem: CartItem = {
-      ...itemData,
-      id: `cart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    };
-
-    console.log('🛒 Creating new cart item:', newItem);
-
-    // Update state immediately
-    setItems(prevItems => {
-      const newItems = [...prevItems, newItem];
-      console.log('✅ Cart state updated - total items:', newItems.length);
-      console.log('🛒 New cart contents:', newItems);
-      return newItems;
     });
-
-    toast({
-      title: "Added to cart",
-      description: `${itemData.service_title} has been added to your cart`,
-    });
-
-    console.log('✅ ADD ITEM COMPLETED SUCCESSFULLY');
-    return true;
-  }, [items, toast]);
+  }, [toast]);
 
   const removeItem = useCallback((itemId: string) => {
     console.log('🗑️ Removing item from cart:', itemId);
