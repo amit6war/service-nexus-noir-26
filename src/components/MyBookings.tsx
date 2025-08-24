@@ -28,10 +28,10 @@ interface Booking {
   services?: {
     title: string;
     provider_id: string;
-  };
+  } | null;
   provider_profiles?: {
     business_name: string;
-  };
+  } | null;
 }
 
 const MyBookings = () => {
@@ -76,7 +76,8 @@ const MyBookings = () => {
       }
 
       console.log('Loaded bookings with enhanced data:', data);
-      setBookings(data || []);
+      // Type assertion to handle the Supabase response properly
+      setBookings(data as Booking[] || []);
     } catch (error) {
       console.error('Error loading bookings:', error);
       toast({
@@ -170,7 +171,7 @@ const MyBookings = () => {
   );
 
   const renderBookingCard = (booking: Booking, isPast: boolean = false) => {
-    // Fixed: Access service and provider data as single objects, not arrays
+    // Safe access with proper fallbacks
     const serviceName = booking.services?.title || 'Service';
     const providerName = booking.provider_profiles?.business_name || 'Provider';
 
