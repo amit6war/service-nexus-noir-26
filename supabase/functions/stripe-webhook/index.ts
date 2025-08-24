@@ -83,9 +83,11 @@ serve(async (req) => {
           currency: session.currency?.toUpperCase() || 'USD',
           payment_status: 'completed',
           stripe_charge_id: paymentIntentId,
+          stripe_session_id: session.id,
           payment_method: 'stripe_checkout',
           processed_at: new Date().toISOString(),
-          payment_intent_id: paymentIntentId
+          payment_intent_id: paymentIntentId,
+          // booking_id will be set later by the frontend
         })
         .select('id')
         .single();
@@ -93,7 +95,7 @@ serve(async (req) => {
       if (paymentError) {
         logStep("Error recording payment", { error: paymentError });
         
-        // If we can't record the payment, we should create a refund
+        // Create automatic refund if payment recording fails
         try {
           if (paymentIntentId) {
             const refund = await stripe.refunds.create({
@@ -118,7 +120,10 @@ serve(async (req) => {
         }), { status: 500 });
       }
 
-      logStep("Payment recorded successfully", { paymentId: paymentData.id });
+      logStep("Payment recorded successfully - awaiting booking linkage", { 
+        paymentId: paymentData.id,
+        sessionId: session.id 
+      });
 
       // The actual booking creation will be handled by the frontend PaymentSuccess component
       // This webhook just ensures the payment is properly recorded

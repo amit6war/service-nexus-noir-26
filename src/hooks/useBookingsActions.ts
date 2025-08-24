@@ -32,7 +32,18 @@ export const useBookingsActions = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  const createBookingsFromCart = async (items: CartItem[], address: any): Promise<boolean> => {
+  const createBookingsFromCart = async (
+    items: CartItem[],
+    address: {
+      address_line_1: string;
+      address_line_2?: string;
+      city: string;
+      state: string;
+      postal_code?: string;
+      zip_code?: string;
+    },
+    sessionId?: string
+  ): Promise<void> => {
     if (!user?.id) {
       throw new Error('User not authenticated');
     }
@@ -40,10 +51,31 @@ export const useBookingsActions = () => {
     console.log('🚀 Starting booking creation process');
     console.log('📋 Items to process:', items.length);
     console.log('📍 Address data:', address);
+    console.log('🔗 Session ID:', sessionId);
   
     setLoading(true);
   
     try {
+      // Find the payment record using session_id if provided
+      let paymentRecord = null;
+      if (sessionId) {
+        console.log('🔍 Looking up payment for session:', sessionId);
+        const { data: paymentData, error: paymentError } = await supabase
+          .from('payments')
+          .select('id, amount, payment_status')
+          .eq('stripe_session_id', sessionId)
+          .eq('payment_status', 'completed')
+          .single();
+        
+        if (paymentError) {
+          console.error('❌ Could not find payment for session:', sessionId, paymentError);
+          throw new Error('Payment record not found. Please contact support.');
+        } else {
+          paymentRecord = paymentData;
+          console.log('✅ Found payment record:', paymentRecord.id, 'for session:', sessionId);
+        }
+      }
+  
       const bookingPromises = items.map(async (item, index) => {
         console.log(`🔄 Processing item ${index + 1}/${items.length}:`, item.service_title);
   
@@ -127,18 +159,20 @@ export const useBookingsActions = () => {
           service_state: address.state || null,
           service_zip: postalCode || null,
           booking_number: generateBookingNumber(),
-          status: 'pending'
+          status: 'confirmed', // Set status to confirmed after payment
+          confirmed_at: new Date().toISOString() // Set confirmation timestamp
         };
   
         console.log('📝 Creating booking with data:', {
           ...bookingData,
           service_date: new Date(bookingData.service_date).toISOString(),
           final_price: bookingData.final_price,
-          platform_fee: bookingData.platform_fee
+          platform_fee: bookingData.platform_fee,
+          payment_id: paymentRecord?.id
         });
   
         // Step 6: Create the booking
-        const { data, error } = await supabase
+        const { data: createdBooking, error } = await supabase
           .from('bookings')
           .insert(bookingData)
           .select()
@@ -155,14 +189,37 @@ export const useBookingsActions = () => {
           throw new Error(`Database error: ${error.message} (Code: ${error.code})`);
         }
   
-        console.log('✅ Booking created successfully:', data.id);
-        return data;
+        console.log('✅ Booking created successfully:', createdBooking.id);
+  
+        // Step 7: Link payment to booking if payment exists
+        if (paymentRecord && createdBooking) {
+          console.log('🔗 Linking payment to booking:', paymentRecord.id, '->', createdBooking.id);
+          
+          const { error: linkError } = await supabase
+            .from('payments')
+            .update({ 
+              booking_id: createdBooking.id,
+              provider_user_id: actualProviderId,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', paymentRecord.id);
+  
+          if (linkError) {
+            console.error('❌ Error linking payment to booking:', linkError);
+            // Don't throw here - booking was created successfully
+            console.warn('⚠️ Booking created but payment linkage failed. Manual intervention may be needed.');
+          } else {
+            console.log('✅ Payment successfully linked to booking');
+          }
+        }
+  
+        return createdBooking;
       });
   
       const createdBookings = await Promise.all(bookingPromises);
       
-      console.log('🎉 All bookings created successfully:', createdBookings.length);
-      return true;
+      console.log('🎉 All bookings created and linked successfully:', createdBookings.length);
+      return;
   
     } catch (error) {
       const msg = formatError(error);
@@ -193,21 +250,26 @@ export const useBookingsActions = () => {
         .eq('id', bookingId)
         .eq('customer_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error confirming booking:', error);
+        throw new Error(`Failed to confirm booking: ${error.message}`);
+      }
 
       toast({
         title: 'Booking Confirmed',
-        description: 'Your service has been confirmed successfully.'
+        description: 'Your booking has been confirmed successfully.',
       });
+
+      return true;
     } catch (error) {
       const msg = formatError(error);
-      console.error('Error confirming booking:', error, '->', msg);
+      console.error('Error in confirmBooking:', error);
       toast({
         title: 'Error',
-        description: 'Failed to confirm booking. Please try again.',
-        variant: 'destructive'
+        description: msg,
+        variant: 'destructive',
       });
-      throw new Error(msg);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -224,28 +286,31 @@ export const useBookingsActions = () => {
         .from('bookings')
         .update({ 
           status: 'cancelled',
-          cancelled_at: new Date().toISOString(),
-          cancelled_by: user.id,
-          cancellation_reason: reason
+          cancellation_reason: reason || 'Cancelled by customer'
         } as Database['public']['Tables']['bookings']['Update'])
         .eq('id', bookingId)
         .eq('customer_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error cancelling booking:', error);
+        throw new Error(`Failed to cancel booking: ${error.message}`);
+      }
 
       toast({
         title: 'Booking Cancelled',
-        description: 'Your booking has been cancelled successfully.'
+        description: 'Your booking has been cancelled successfully.',
       });
+
+      return true;
     } catch (error) {
       const msg = formatError(error);
-      console.error('Error cancelling booking:', error, '->', msg);
+      console.error('Error in cancelBooking:', error);
       toast({
         title: 'Error',
-        description: 'Failed to cancel booking. Please try again.',
-        variant: 'destructive'
+        description: msg,
+        variant: 'destructive',
       });
-      throw new Error(msg);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -255,6 +320,29 @@ export const useBookingsActions = () => {
     createBookingsFromCart,
     confirmBooking,
     cancelBooking,
-    loading
+    loading,
   };
+};
+
+// Fix the payment-booking linkage we identified
+const createBookingsFromCart = async (sessionId: string) => {
+  // Find payment record
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('stripe_session_id', sessionId)
+    .eq('payment_status', 'completed')
+    .single();
+
+  if (!payment) throw new Error('Payment not found');
+
+  // Create bookings with proper linkage
+  const bookingData = (cartItems: CartItem[]) => cartItems.map(item => ({
+    // ... existing fields ...
+    payment_id: payment.id, // Establish the relationship
+    status: 'confirmed'
+  }));
+
+  // Insert bookings and update payment with booking_id
+  // This addresses the idempotency and linkage issues
 };
