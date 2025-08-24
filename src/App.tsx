@@ -1,3 +1,4 @@
+
 import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -6,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ErrorBoundary from "@/components/ErrorBoundary";
-const Home = lazy(() => import("./pages/Home"));
+const Home = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 const CustomerDashboard = lazy(() => import("./pages/CustomerDashboard"));
 const ProviderDashboard = lazy(() => import("./pages/ProviderDashboard"));
@@ -15,7 +16,6 @@ const Services = lazy(() => import("./pages/Services"));
 const Providers = lazy(() => import("./pages/Providers"));
 const Provider = lazy(() => import("./pages/Provider"));
 const CheckoutV2 = lazy(() => import("./pages/CheckoutV2"));
-
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 
 const queryClient = new QueryClient();
