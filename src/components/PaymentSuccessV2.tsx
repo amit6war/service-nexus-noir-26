@@ -46,9 +46,10 @@ const PaymentSuccessV2 = () => {
       const rawItems = JSON.parse(pendingItems);
       const rawAddress = JSON.parse(pendingAddress);
       
-      // Ensure all required fields are present and properly typed with required fields
+      // Ensure all required fields are present and properly typed
       const itemsWithIds: CartItem[] = rawItems.map((item: any, index: number) => {
-        const cartItem: CartItem = {
+        // Use type assertion after ensuring all required fields are present
+        const processedItem = {
           id: item.id || `temp-${index}-${Date.now()}`,
           service_id: item.service_id || '',
           provider_id: item.provider_id || '',
@@ -58,8 +59,9 @@ const PaymentSuccessV2 = () => {
           duration_minutes: Number(item.duration_minutes) || 0,
           scheduled_date: item.scheduled_date || new Date().toISOString(),
           special_instructions: item.special_instructions || ''
-        };
-        return cartItem;
+        } as CartItem;
+        
+        return processedItem;
       });
       
       // Validate checkout data
