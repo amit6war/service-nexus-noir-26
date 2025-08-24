@@ -31,8 +31,36 @@ export const useShoppingCart = () => {
         const parsedCart = JSON.parse(savedCart);
         if (Array.isArray(parsedCart)) {
           console.log('📥 Loading cart from storage:', parsedCart);
-          setItems(parsedCart);
-          console.log('✅ Cart loaded from storage:', parsedCart.length, 'items');
+          
+          // Filter out items with invalid scheduled_date
+          const validItems = parsedCart.filter((item: CartItem) => {
+            if (!item.scheduled_date) {
+              console.warn('⚠️ Removing item with missing scheduled_date:', item.service_title);
+              return false;
+            }
+            
+            const date = new Date(item.scheduled_date);
+            const isValid = !isNaN(date.getTime());
+            
+            if (!isValid) {
+              console.warn('⚠️ Removing item with invalid scheduled_date:', item.service_title, item.scheduled_date);
+              return false;
+            }
+            
+            return true;
+          });
+          
+          setItems(validItems);
+          console.log('✅ Cart loaded from storage:', validItems.length, 'valid items out of', parsedCart.length, 'total');
+          
+          // If we filtered out invalid items, show a toast notification
+          if (validItems.length < parsedCart.length) {
+            toast({
+              title: "Cart Updated",
+              description: `Removed ${parsedCart.length - validItems.length} item(s) with invalid scheduling data.`,
+              variant: "default"
+            });
+          }
         }
       } else {
         console.log('📭 No existing cart found in storage');

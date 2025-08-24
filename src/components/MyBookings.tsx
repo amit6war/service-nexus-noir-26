@@ -173,6 +173,49 @@ const MyBookings = () => {
     }
   };
 
+  const handleCompleteBooking = async (bookingId: string) => {
+    if (!user?.id) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to complete bookings.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      console.log('🔄 Completing booking:', bookingId);
+      
+      // Use the database function for proper status transition
+      const { data, error } = await supabase.rpc('update_booking_status', {
+        booking_uuid: bookingId,
+        new_status: 'completed',
+        user_uuid: user.id,
+        status_notes: 'Service completed by provider'
+      });
+
+      if (error) {
+        console.error('❌ Error completing booking:', error);
+        throw error;
+      }
+
+      console.log('✅ Booking completed successfully');
+      toast({
+        title: 'Booking Completed',
+        description: 'The booking has been marked as completed. Customer will be notified.'
+      });
+      
+      loadBookings(); // Refresh the list
+    } catch (error) {
+      console.error('❌ Failed to complete booking:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to complete booking. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const handleDownloadInvoice = (booking: Booking) => {
     toast({
       title: 'Invoice Download',
@@ -228,7 +271,9 @@ const MyBookings = () => {
   const now = new Date();
   const upcomingBookings = sortedBookings.filter(booking => 
     isAfter(new Date(booking.service_date), now) && 
-    (booking.status === 'confirmed' || booking.status === 'accepted' || booking.status === 'in_progress')
+
+    (booking.status === 'pending' || booking.status === 'confirmed' || booking.status === 'accepted' || booking.status === 'in_progress')
+
   );
   
   const pastBookings = sortedBookings.filter(booking => 
@@ -310,6 +355,19 @@ const MyBookings = () => {
                   >
                     <RotateCcw className="w-4 h-4 mr-2" />
                     Reschedule
+                  </Button>
+                )}
+                
+                {/* Provider can mark confirmed bookings as completed */}
+                {!isPast && booking.status === 'confirmed' && user?.id === booking.provider_user_id && (
+                  <Button
+                    onClick={() => handleCompleteBooking(booking.id)}
+                    disabled={actionLoading}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Mark Complete
                   </Button>
                 )}
                 

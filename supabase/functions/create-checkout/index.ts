@@ -107,7 +107,7 @@ serve(async (req) => {
       customer_email: customerId ? undefined : userData.user.email,
       line_items: lineItems,
       mode: "payment",
-      success_url: `${req.headers.get("origin")}/payment-success`,
+      success_url: `${req.headers.get("origin")}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin")}/checkout?payment=cancelled`,
       metadata: checkoutMetadata,
       payment_intent_data: {

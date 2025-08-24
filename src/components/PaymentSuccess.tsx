@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useBookingsActions } from '@/hooks/useBookingsActions';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +11,7 @@ const PAYMENT_PROCESSED_FLAG = 'payment_success_processed';
 
 const PaymentSuccess = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { clearCart } = useShoppingCart();
   const { createBookingsFromCart } = useBookingsActions();
@@ -28,7 +29,10 @@ const PaymentSuccess = () => {
   const processPaymentSuccess = async (isRetry = false) => {
     // Guard if already processed in this session and not a retry
     if (!isRetry && (hasTriggeredRef.current || sessionStorage.getItem(PAYMENT_PROCESSED_FLAG) === 'true')) {
-      console.log('ℹ️ Payment success already processed. Skipping duplicate run.');
+      console.log('ℹ️ Payment success already processed. Showing success state.');
+      // Show success state for already processed payments
+      setBookingsCreated(true);
+      setShowModal(true);
       return;
     }
 
@@ -53,40 +57,50 @@ const PaymentSuccess = () => {
       return;
     }
 
+    // Extract session_id from URL parameters
+    const sessionId = searchParams.get('session_id');
+    
+    if (!sessionId) {
+      console.log('❌ No session_id found in URL parameters');
+      setError('Invalid payment session. Please contact support if you were charged.');
+      setShowModal(true);
+      return;
+    }
+  
     try {
       hasTriggeredRef.current = true;
       setCreating(true);
       setError(null);
-      console.log('🧾 User:', user.id, '🔄 Creating bookings after successful payment...');
-
+      console.log('🧾 User:', user.id, '🔄 Creating bookings after successful payment with session:', sessionId);
+  
       const items = JSON.parse(pendingItems);
       const address = JSON.parse(pendingAddress);
-
-      console.log('📝 Creating bookings with items:', items.length, 'address:', address);
-
-      const success = await createBookingsFromCart(items, address);
-
-      if (success) {
-        console.log('✅ Bookings created successfully');
-
+  
+      console.log('📝 Creating bookings with items:', items.length, 'address:', address, 'sessionId:', sessionId);
+  
+      const success = await createBookingsFromCart(items, address, sessionId);
+  
+      if (success !== undefined) {
+        console.log('✅ Bookings created and payments linked successfully');
+  
         // Mark processed to avoid duplicates on refresh
         sessionStorage.setItem(PAYMENT_PROCESSED_FLAG, 'true');
-
+  
         // Clear cart and temp data
         clearCart();
         sessionStorage.removeItem('pendingCheckoutItems');
         sessionStorage.removeItem('pendingCheckoutAddress');
         sessionStorage.removeItem('checkoutTimestamp');
-
+  
         setBookingsCreated(true);
         setShowModal(true);
-
+  
         toast({
           title: 'Payment & Booking Successful!',
-          description: `${items.length} booking${items.length !== 1 ? 's' : ''} created successfully. You will receive confirmation emails shortly.`,
+          description: `${items.length} booking${items.length !== 1 ? 's' : ''} created and linked to payment successfully.`,
         });
-
-        console.log('🎉 Payment success process completed');
+  
+        console.log('🎉 Payment success process completed with proper linkage');
       } else {
         throw new Error('Failed to create bookings after payment');
       }
@@ -95,12 +109,10 @@ const PaymentSuccess = () => {
       console.error('❌ Error creating bookings after payment:', err, '->', friendly);
       setError(`Booking creation failed: ${friendly}`);
       setShowModal(true);
-
-      // Keep toast wording the same (no UI change), but logs have details
+  
       toast({
         title: 'Booking Creation Failed',
-        description:
-          'Your payment was processed successfully, but we encountered an issue creating your bookings. Our team has been notified and will process a refund within 3-5 business days if needed.',
+        description: 'Your payment was processed successfully, but we encountered an issue creating your bookings. Our team has been notified and will process a refund within 3-5 business days if needed.',
         variant: 'destructive',
         duration: 10000,
       });
