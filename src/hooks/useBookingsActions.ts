@@ -7,7 +7,7 @@ type UUID = string;
 
 export type CartItem = {
   service_id: UUID;
-  provider_id: UUID; // provider's user_id
+  provider_id: UUID; // provider's user_id (may come as non-UUID from older flows; we'll resolve from backend)
   service_title?: string;
   provider_name?: string;
   price: number;
@@ -50,6 +50,13 @@ function formatServiceAddress(addr: Address) {
 
 type BookingInsert = Database['public']['Tables']['bookings']['Insert'];
 
+// Helper to check UUID format
+const isUUID = (val: string | undefined | null) => {
+  if (!val || typeof val !== 'string') return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(val);
+};
+
 export const useBookingsActions = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -68,49 +75,75 @@ export const useBookingsActions = () => {
       const customerId = userData.user.id;
       const service_address = formatServiceAddress(address);
 
-      console.log('Creating bookings with items:', items);
-      console.log('Customer ID:', customerId);
+      console.log('[Bookings] Creating bookings with items:', items);
+      console.log('[Bookings] Customer ID:', customerId);
 
-      // Validate that all provider_ids are valid UUIDs and providers exist
+      // Resolve provider IDs from backend using the service_id to avoid invalid provider IDs from cart
+      const distinctServiceIds = Array.from(new Set(items.map(i => i.service_id)));
+      console.log('[Bookings] Distinct service IDs to resolve providers:', distinctServiceIds);
+
+      const { data: servicesData, error: servicesError } = await supabase
+        .from('services')
+        .select('id, provider_id')
+        .in('id', distinctServiceIds);
+
+      if (servicesError) {
+        console.error('[Bookings] Error fetching services for provider resolution:', servicesError);
+        throw new Error(`Failed to fetch services for provider mapping: ${servicesError.message}`);
+      }
+
+      const serviceProviderMap: Record<string, string> = {};
+      (servicesData ?? []).forEach(svc => {
+        // @ts-expect-error Supabase typed id as UUID; cast to string for map key
+        serviceProviderMap[String(svc.id)] = String(svc.provider_id);
+      });
+      console.log('[Bookings] Service -> Provider map:', serviceProviderMap);
+
+      // Validate providers exist and finalize provider IDs
+      const resolvedProviderIds: string[] = [];
       for (const item of items) {
-        console.log('Validating provider:', item.provider_id);
-        
-        if (!item.provider_id || typeof item.provider_id !== 'string') {
-          console.error('Invalid provider ID format:', item.provider_id);
-          throw new Error(`Invalid provider ID format: ${item.provider_id}`);
+        let providerId = item.provider_id;
+
+        // If providerId is not a UUID, resolve from the services table using service_id
+        if (!isUUID(providerId)) {
+          const mapped = serviceProviderMap[item.service_id];
+          if (mapped && isUUID(mapped)) {
+            console.log('[Bookings] Resolved provider via service map:', {
+              service_id: item.service_id,
+              original_provider_id: item.provider_id,
+              resolved_provider_id: mapped,
+            });
+            providerId = mapped;
+          } else {
+            console.error('[Bookings] Unable to resolve provider for service:', item.service_id, 'item:', item);
+            throw new Error(`Could not resolve provider for service ${item.service_id}. Please try re-adding the service.`);
+          }
         }
-        
-        // Validate UUID format
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(item.provider_id)) {
-          console.error('Invalid UUID format:', item.provider_id);
-          throw new Error(`Invalid provider UUID format: ${item.provider_id}`);
-        }
-        
+
         // Check if provider exists in the system
         const { data: providerExists, error: providerError } = await supabase
           .from('provider_profiles')
           .select('user_id')
-          .eq('user_id', item.provider_id)
+          .eq('user_id', providerId)
           .maybeSingle();
 
         if (providerError) {
-          console.error('Provider lookup error:', { provider_id: item.provider_id, error: providerError });
+          console.error('[Bookings] Provider lookup error:', { provider_id: providerId, error: providerError });
           throw new Error(`Provider lookup failed: ${providerError.message}`);
         }
-        
+
         if (!providerExists) {
-          console.error('Provider not found:', item.provider_id);
-          throw new Error(`Provider not found in system: ${item.provider_id}`);
+          console.error('[Bookings] Provider not found in system:', providerId);
+          throw new Error(`Provider not found in system: ${providerId}`);
         }
-        
-        console.log('Provider validation successful:', item.provider_id);
+
+        resolvedProviderIds.push(providerId);
       }
 
-      // Build typed booking rows (omit status to use DB default 'pending')
-      const rows: BookingInsert[] = items.map((item) => ({
+      // Build typed booking rows using resolved provider IDs
+      const rows: BookingInsert[] = items.map((item, idx) => ({
         customer_id: customerId,
-        provider_user_id: item.provider_id,
+        provider_user_id: resolvedProviderIds[idx],
         service_id: item.service_id,
         service_date: item.scheduled_date,
         duration_minutes: item.duration_minutes ?? null,
@@ -124,7 +157,7 @@ export const useBookingsActions = () => {
         service_zip: address.zip_code ?? null,
       }));
 
-      console.log('Inserting booking rows:', rows);
+      console.log('[Bookings] Inserting booking rows:', rows);
 
       setLoading(true);
       try {
@@ -134,11 +167,11 @@ export const useBookingsActions = () => {
           .select('id, booking_number, status, service_date, final_price');
 
         if (error) {
-          console.error('Booking creation error:', error);
+          console.error('[Bookings] Booking creation error:', error);
           throw new Error(error.message);
         }
 
-        console.log('Bookings created successfully:', data);
+        console.log('[Bookings] Bookings created successfully:', data);
 
         toast({
           title: 'Bookings created',
@@ -146,9 +179,6 @@ export const useBookingsActions = () => {
         });
 
         return true;
-      } catch (error) {
-        console.error('Error creating bookings:', error);
-        throw error;
       } finally {
         setLoading(false);
       }
