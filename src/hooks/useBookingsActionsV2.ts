@@ -5,8 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiService } from '@/services/api';
-import { validateData, BookingSchema } from '@/lib/validation';
-import { AuthenticationError, BookingError, ValidationError } from '@/lib/errors';
+import { validateData, BookingSchema, CartItemSchema } from '@/lib/validation';
+import { AuthenticationError, BookingError, handleError } from '@/lib/errors';
 import type { Database } from '@/integrations/supabase/types';
 import type { CartItem, Booking, Address } from '@/types';
 
@@ -71,7 +71,7 @@ export const useBookingsActionsV2 = () => {
         }
 
         // Create booking data with validation
-        const bookingData = {
+        const bookingData: Database['public']['Tables']['bookings']['Insert'] = {
           customer_id: user.id,
           provider_user_id: actualProviderId,
           service_id: item.service_id,
@@ -88,15 +88,12 @@ export const useBookingsActionsV2 = () => {
           booking_number: `BK-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
         };
 
-        // Validate booking data
-        const validatedBookingData = validateData(BookingSchema, bookingData);
-
-        console.log('💾 Creating booking:', validatedBookingData.booking_number);
+        console.log('💾 Creating booking:', bookingData.booking_number);
 
         const bookingResult = await apiService.mutate<Booking>(() => 
           supabase
             .from('bookings')
-            .insert(validatedBookingData as Database['public']['Tables']['bookings']['Insert'])
+            .insert(bookingData)
             .select()
             .single()
         );

@@ -14,6 +14,7 @@ export const AddressSchema = z.object({
 });
 
 export const CartItemSchema = z.object({
+  id: z.string().min(1, 'Cart item ID is required'),
   service_id: z.string().uuid('Invalid service ID'),
   provider_id: z.string().uuid('Invalid provider ID'),
   service_title: z.string().min(1, 'Service title is required'),

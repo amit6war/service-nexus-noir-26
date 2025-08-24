@@ -47,9 +47,22 @@ const PaymentSuccessV2 = () => {
       const rawItems = JSON.parse(pendingItems);
       const rawAddress = JSON.parse(pendingAddress);
       
+      // Add missing id field to cart items if not present
+      const itemsWithIds = rawItems.map((item: any, index: number) => ({
+        id: item.id || `temp-${index}-${Date.now()}`,
+        service_id: item.service_id,
+        provider_id: item.provider_id,
+        service_title: item.service_title,
+        provider_name: item.provider_name,
+        price: item.price,
+        duration_minutes: item.duration_minutes,
+        scheduled_date: item.scheduled_date,
+        special_instructions: item.special_instructions || ''
+      }));
+      
       // Validate checkout data
       const checkoutData = validateData(CheckoutDataSchema, {
-        items: rawItems,
+        items: itemsWithIds,
         address: rawAddress
       });
       
@@ -210,7 +223,7 @@ const PaymentSuccessV2 = () => {
                     <h4 className="font-semibold mb-2">Bookings Created:</h4>
                     <div className="space-y-2 text-sm">
                       {createdBookings.map((booking, index) => (
-                        <div key={index} className="flex justify-between items-center">
+                        <div key={booking.id || index} className="flex justify-between items-center">
                           <span>{booking.service_title}</span>
                           <span className="text-teal font-medium">${booking.price}</span>
                         </div>
