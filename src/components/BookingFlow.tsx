@@ -1,16 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Calendar, Clock, User, Star, DollarSign, CalendarIcon, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Calendar, Clock, User, Star, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { EnhancedCalendar } from '@/components/ui/enhanced-calendar';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { format, addDays, isBefore, startOfDay, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getYear, getMonth, setYear, setMonth } from 'date-fns';
+import { format, isBefore, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface BookingFlowProps {
@@ -238,21 +238,23 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
               <CardHeader>
                 <CardTitle>
                   <Calendar className="w-4 h-4 inline mr-2" />
-                  Select Date
+                  Schedule Your Service
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <CalendarComponent
+                <EnhancedCalendar
                   mode="single"
                   selected={selectedDate}
                   onSelect={handleDateSelect}
                   disabled={isDateDisabled}
+                  bookedSlots={bookedSlots}
+                  providerId={provider?.user_id}
                   className={cn("w-full pointer-events-auto")}
                 />
                 
                 {selectedDate && (
-                  <div className="mt-4 p-3 bg-accent/50 rounded-lg">
-                    <p className="text-sm font-medium">
+                  <div className="mt-4 p-3 bg-accent/10 border border-accent/20 rounded-lg">
+                    <p className="text-sm font-medium text-foreground">
                       Selected Date: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
                     </p>
                   </div>
@@ -291,15 +293,16 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
                                  variant={isSelected ? "default" : "outline"}
                                  size="sm"
                                  className={cn(
-                                   "h-10",
-                                   isSelected && "bg-teal hover:bg-teal/90",
-                                   !isAvailable && "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                                   "h-10 transition-all duration-200",
+                                   isSelected && "bg-teal hover:bg-teal-dark text-white",
+                                   !isAvailable && "opacity-40 cursor-not-allowed bg-muted/50 text-muted-foreground border-muted hover:bg-muted/50 hover:text-muted-foreground",
+                                   isAvailable && !isSelected && "border-border hover:bg-accent/20 hover:border-accent/50"
                                  )}
                                  onClick={() => handleTimeSlotSelect(time)}
                                  disabled={!isAvailable}
                                >
                                  {time}
-                                 {!isAvailable && <span className="ml-1 text-xs">(Booked)</span>}
+                                 {!isAvailable && <span className="ml-1 text-xs opacity-70">(Booked)</span>}
                                </Button>
                              );
                            })}

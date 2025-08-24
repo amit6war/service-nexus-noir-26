@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { EnhancedCalendar } from '@/components/ui/enhanced-calendar';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/hooks/use-toast';
@@ -52,7 +53,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState<'providers' | 'booking'>('providers');
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [providers, setProviders] = useState<any[]>([]);
@@ -64,6 +65,28 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
   const { addItem } = useShoppingCart();
   const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const { toast } = useToast();
+
+  // Handle date selection from enhanced calendar
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date);
+    setSelectedTime(''); // Reset time when date changes
+  };
+
+  // Check if a date should be disabled
+  const isDateDisabled = (date: Date) => {
+    const today = startOfDay(new Date());
+    return date < today;
+  };
+
+  // Check if a time slot is booked
+  const isTimeSlotBooked = (date: Date, time: string) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return existingBookings.some(booking => 
+      booking.provider_id === selectedProvider?.user_id &&
+      booking.date === dateStr &&
+      booking.time === time
+    );
+  };
 
   // Generate available dates (next 30 days)
   useEffect(() => {
@@ -111,16 +134,6 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
 
     loadExistingBookings();
   }, [selectedProvider]);
-
-  // Check if a time slot is booked
-  const isTimeSlotBooked = (date: Date, time: string) => {
-    const dateTimeString = `${format(date, 'yyyy-MM-dd')}T${time}:00`;
-    return existingBookings.some(booking => {
-      const bookingDate = parseISO(booking.service_date);
-      const checkDate = parseISO(dateTimeString);
-      return Math.abs(bookingDate.getTime() - checkDate.getTime()) < 60000; // Within 1 minute
-    });
-  };
 
   // Load real providers from database
   useEffect(() => {
@@ -227,7 +240,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
       return;
     }
 
-    const scheduledDateTime = `${selectedDate}T${selectedTime}:00`;
+    const scheduledDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTime}:00`;
 
     const cartItem = {
       service_id: selectedService.id,
@@ -426,20 +439,23 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
                   <Calendar className="w-4 h-4 inline mr-1" />
                   Select Date
                 </label>
-                <div className="grid grid-cols-7 gap-2">
-                  {availableDates.slice(0, 14).map((date, index) => (
-                    <Button
-                      key={index}
-                      variant={selectedDate === format(date, 'yyyy-MM-dd') ? 'default' : 'outline'}
-                      size="sm"
-                      className="h-16 flex flex-col"
-                      onClick={() => setSelectedDate(format(date, 'yyyy-MM-dd'))}
-                    >
-                      <span className="text-xs">{format(date, 'EEE')}</span>
-                      <span className="text-sm font-bold">{format(date, 'd')}</span>
-                    </Button>
-                  ))}
-                </div>
+                <EnhancedCalendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={handleDateSelect}
+                  disabled={isDateDisabled}
+                  bookedSlots={existingBookings}
+                  providerId={selectedProvider?.user_id}
+                  className="w-full"
+                />
+                
+                {selectedDate && (
+                  <div className="mt-4 p-3 bg-accent/10 border border-accent/20 rounded-lg">
+                    <p className="text-sm font-medium text-foreground">
+                      Selected Date: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Time Selection */}
@@ -451,7 +467,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {availableTimes.map((time) => {
-                      const isBooked = isTimeSlotBooked(new Date(selectedDate), time);
+                      const isBooked = isTimeSlotBooked(selectedDate, time);
                       return (
                         <Button
                           key={time}

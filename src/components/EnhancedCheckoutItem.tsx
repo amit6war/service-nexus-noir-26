@@ -20,6 +20,19 @@ interface EnhancedCheckoutItemProps {
 }
 
 const EnhancedCheckoutItem: React.FC<EnhancedCheckoutItemProps> = ({ item }) => {
+  // Helper function to safely format dates
+  const formatDate = (dateString: string, formatString: string) => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      return format(date, formatString);
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
   return (
     <Card className="border border-border">
       <CardContent className="p-4">
@@ -40,11 +53,11 @@ const EnhancedCheckoutItem: React.FC<EnhancedCheckoutItemProps> = ({ item }) => 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Calendar className="w-4 h-4" />
-            <span>{format(new Date(item.scheduled_date), 'PPP')}</span>
+            <span>{formatDate(item.scheduled_date, 'PPP')}</span>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="w-4 h-4" />
-            <span>{format(new Date(item.scheduled_date), 'p')} ({item.duration_minutes} min)</span>
+            <span>{formatDate(item.scheduled_date, 'p')} ({item.duration_minutes} min)</span>
           </div>
         </div>
         
