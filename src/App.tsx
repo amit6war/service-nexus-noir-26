@@ -14,6 +14,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import ProviderProfile from "./pages/ProviderProfile";
 import Checkout from "./pages/Checkout";
 import ProviderDetail from "./pages/ProviderDetail";
+import PaymentSuccess from "./components/PaymentSuccess";
 import NotFound from "./pages/NotFound";
 
 // Protected Route Component
@@ -92,6 +93,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Checkout />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/payment-success" 
+        element={
+          <ProtectedRoute>
+            <PaymentSuccess />
           </ProtectedRoute>
         } 
       />

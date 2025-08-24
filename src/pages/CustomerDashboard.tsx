@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Calendar, Heart, ShoppingCart, Star, Clock, MapPin, Bell, LogOut } from 'lucide-react';
+import { User, Calendar, Heart, ShoppingCart, Star, Clock, MapPin, Bell, LogOut, DollarSign } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,9 +12,10 @@ import ServiceProviderFlow from '@/components/ServiceProviderFlow';
 import CartSection from '@/components/CartSection';
 import ProfileSettings from '@/components/ProfileSettings';
 import MyBookings from '@/components/MyBookings';
+import AmountSection from '@/components/AmountSection';
 
 const CustomerDashboard = () => {
-  const [activeTab, setActiveTab] = useState('browse');
+  const [activeTab, setActiveTab] = useState('services');
   const [selectedService, setSelectedService] = useState(null);
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [showCart, setShowCart] = useState(false);
@@ -24,6 +25,21 @@ const CustomerDashboard = () => {
   const { itemCount, initialized } = useShoppingCart();
 
   console.log('🏠 CustomerDashboard render - cart itemCount:', itemCount, 'initialized:', initialized);
+
+  // Handle URL parameters and state for tab switching
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam && ['services', 'bookings', 'amount', 'favorites', 'profile'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+    
+    // Handle navigation state
+    const state = (window.history.state?.usr);
+    if (state?.tab) {
+      setActiveTab(state.tab);
+    }
+  }, []);
 
   // Force re-render when cart changes by watching itemCount
   useEffect(() => {
@@ -41,7 +57,7 @@ const CustomerDashboard = () => {
   const handleBookingComplete = () => {
     setSelectedService(null);
     setSelectedProvider(null);
-    setActiveTab('browse');
+    setActiveTab('services');
     // Refresh services data after booking completion
     if (silentRefresh) {
       silentRefresh();
@@ -82,15 +98,15 @@ const CustomerDashboard = () => {
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2">
           <button
-            onClick={() => setActiveTab('browse')}
+            onClick={() => setActiveTab('services')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
-              activeTab === 'browse' 
+              activeTab === 'services' 
                 ? 'bg-teal/10 text-teal border border-teal/20' 
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
             }`}
           >
             <Star className="w-5 h-5" />
-            Browse Services
+            Services
           </button>
           
           <button
@@ -103,6 +119,18 @@ const CustomerDashboard = () => {
           >
             <Calendar className="w-5 h-5" />
             My Bookings
+          </button>
+
+          <button
+            onClick={() => setActiveTab('amount')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              activeTab === 'amount' 
+                ? 'bg-teal/10 text-teal border border-teal/20' 
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <DollarSign className="w-5 h-5" />
+            Amount
           </button>
           
           <button
@@ -162,11 +190,11 @@ const CustomerDashboard = () => {
       <div className="flex-1 ml-64">
         <div className="h-screen overflow-y-auto">
           <div className="p-6">
-            {/* Browse Services Tab */}
-            {activeTab === 'browse' && !selectedService && (
+            {/* Services Tab */}
+            {activeTab === 'services' && !selectedService && (
               <div className="space-y-6">
                 <div>
-                  <h1 className="text-3xl font-bold text-foreground mb-2">Browse Services</h1>
+                  <h1 className="text-3xl font-bold text-foreground mb-2">Services</h1>
                   <p className="text-muted-foreground">Find the perfect service for your needs</p>
                 </div>
 
@@ -268,7 +296,7 @@ const CustomerDashboard = () => {
             )}
 
             {/* Service Provider Selection */}
-            {activeTab === 'browse' && selectedService && (
+            {activeTab === 'services' && selectedService && (
               <ServiceProviderFlow
                 selectedService={selectedService}
                 onBack={() => {
@@ -282,6 +310,11 @@ const CustomerDashboard = () => {
             {/* My Bookings */}
             {activeTab === 'bookings' && (
               <MyBookings />
+            )}
+
+            {/* Amount Section */}
+            {activeTab === 'amount' && (
+              <AmountSection />
             )}
 
             {activeTab === 'favorites' && (

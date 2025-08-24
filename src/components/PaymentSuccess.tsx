@@ -116,7 +116,7 @@ const PaymentSuccess = () => {
               </Button>
               <Button 
                 variant="outline" 
-                onClick={() => navigate('/customer-dashboard?tab=bookings')}
+                onClick={() => navigate('/customer-dashboard', { state: { tab: 'bookings' } })}
                 disabled={creating}
               >
                 View Bookings
