@@ -1,3 +1,4 @@
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -32,8 +33,8 @@ export const useBookingsActionsV2 = () => {
   const { user } = useAuth();
 
   // Accept booking
-  const acceptBooking = (useMutation as any)({
-    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }): Promise<Booking> => {
+  const acceptBooking = useMutation<Booking, Error, { bookingId: string; notes?: string }, MutationCtx>({
+    mutationFn: async ({ bookingId, notes }) => {
       console.log('🔄 Accepting booking:', bookingId);
       
       if (!user) {
@@ -59,7 +60,7 @@ export const useBookingsActionsV2 = () => {
 
       return res.data as unknown as Booking;
     },
-    onSuccess: async (data: Booking) => {
+    onSuccess: async (data) => {
       console.log('✅ Booking accepted successfully:', data);
       
       // Add status history entry
@@ -90,7 +91,7 @@ export const useBookingsActionsV2 = () => {
         description: "The booking has been accepted successfully. The customer will be notified.",
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: Error) => {
       console.error('❌ Failed to accept booking:', error);
       toast({
         title: "Error",
@@ -101,8 +102,8 @@ export const useBookingsActionsV2 = () => {
   });
 
   // Mark in progress
-  const markInProgress = (useMutation as any)({
-    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }): Promise<Booking> => {
+  const markInProgress = useMutation<Booking, Error, { bookingId: string; notes?: string }, MutationCtx>({
+    mutationFn: async ({ bookingId, notes }) => {
       console.log('🔄 Marking booking in progress:', bookingId);
       
       if (!user) {
@@ -127,7 +128,7 @@ export const useBookingsActionsV2 = () => {
 
       return res.data as unknown as Booking;
     },
-    onSuccess: async (data: Booking) => {
+    onSuccess: async (data) => {
       console.log('✅ Booking marked in progress successfully:', data);
       
       // Add status history entry
@@ -158,7 +159,7 @@ export const useBookingsActionsV2 = () => {
         description: "The booking is now marked as in progress.",
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: Error) => {
       console.error('❌ Failed to mark booking in progress:', error);
       toast({
         title: "Error",
@@ -169,8 +170,8 @@ export const useBookingsActionsV2 = () => {
   });
 
   // Complete booking
-  const completeBooking = (useMutation as any)({
-    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }): Promise<Booking> => {
+  const completeBooking = useMutation<Booking, Error, { bookingId: string; notes?: string }, MutationCtx>({
+    mutationFn: async ({ bookingId, notes }) => {
       console.log('🔄 Completing booking:', bookingId);
       
       if (!user) {
@@ -196,7 +197,7 @@ export const useBookingsActionsV2 = () => {
 
       return res.data as unknown as Booking;
     },
-    onSuccess: async (data: Booking) => {
+    onSuccess: async (data) => {
       console.log('✅ Booking completed successfully:', data);
       
       // Add status history entry
@@ -227,7 +228,7 @@ export const useBookingsActionsV2 = () => {
         description: "The booking has been marked as completed successfully.",
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: Error) => {
       console.error('❌ Failed to complete booking:', error);
       toast({
         title: "Error",
@@ -238,8 +239,8 @@ export const useBookingsActionsV2 = () => {
   });
 
   // Cancel booking
-  const cancelBooking = (useMutation as any)({
-    mutationFn: async ({ bookingId, reason }: CancelBookingParams): Promise<Booking> => {
+  const cancelBooking = useMutation<Booking, Error, CancelBookingParams, MutationCtx>({
+    mutationFn: async ({ bookingId, reason }) => {
       console.log('🔄 Cancelling booking:', bookingId, 'Reason:', reason);
       
       if (!user) {
@@ -265,7 +266,7 @@ export const useBookingsActionsV2 = () => {
 
       return res.data as unknown as Booking;
     },
-    onSuccess: async (data: Booking) => {
+    onSuccess: async (data) => {
       console.log('✅ Booking cancelled successfully:', data);
       
       // Add status history entry
@@ -296,7 +297,7 @@ export const useBookingsActionsV2 = () => {
         description: "The booking has been cancelled successfully.",
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: Error) => {
       console.error('❌ Failed to cancel booking:', error);
       toast({
         title: "Error",
