@@ -1,7 +1,9 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 
 export interface CartItem {
   id: string;
@@ -53,11 +55,11 @@ export const useBookingsActions = () => {
             throw new Error(`Service not found: ${item.service_title}`);
           }
 
-          actualProviderId = serviceData.provider_id;
+          actualProviderId = serviceData.provider_id as string;
           console.log('Found actual provider_id:', actualProviderId);
         }
 
-        const bookingData = {
+        const bookingData: Database['public']['Tables']['bookings']['Insert'] = {
           customer_id: user.id,
           provider_user_id: actualProviderId,
           service_id: item.service_id,
@@ -71,8 +73,8 @@ export const useBookingsActions = () => {
           service_city: address.city,
           service_state: address.state,
           service_zip: address.zip_code,
-          booking_number: `BK-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-          status: 'pending'
+          booking_number: `BK-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+          // status omitted to use DB default 'pending'
         };
 
         console.log('Creating booking with data:', bookingData);
@@ -127,7 +129,7 @@ export const useBookingsActions = () => {
         .update({ 
           status: 'confirmed',
           confirmed_at: new Date().toISOString()
-        })
+        } as Database['public']['Tables']['bookings']['Update'])
         .eq('id', bookingId)
         .eq('customer_id', user.id);
 
@@ -164,7 +166,7 @@ export const useBookingsActions = () => {
           cancelled_at: new Date().toISOString(),
           cancelled_by: user.id,
           cancellation_reason: reason
-        })
+        } as Database['public']['Tables']['bookings']['Update'])
         .eq('id', bookingId)
         .eq('customer_id', user.id);
 
