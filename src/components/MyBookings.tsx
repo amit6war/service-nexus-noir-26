@@ -49,25 +49,21 @@ const MyBookings = () => {
     try {
       setLoading(true);
       
-      // Query with manual join condition
-      const { data, error } = await supabase
+      // First fetch bookings with services
+      const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
           *,
           services (
             title,
             provider_id
-          ),
-          provider_profiles!inner (
-            business_name
           )
         `)
         .eq('customer_id', user.id)
-        .eq('provider_profiles.user_id', 'bookings.provider_user_id')
         .order('service_date', { ascending: false });
 
-      if (error) {
-        console.error('Error loading bookings:', error);
+      if (bookingsError) {
+        console.error('Error loading bookings:', bookingsError);
         toast({
           title: 'Error',
           description: 'Failed to load bookings. Please try again.',
@@ -76,14 +72,42 @@ const MyBookings = () => {
         return;
       }
 
-      console.log('Loaded bookings with enhanced data:', data);
-      // Convert the Supabase response to our Booking type with proper null handling
-      const bookingsData: Booking[] = (data || []).map(booking => ({
+      if (!bookingsData) {
+        setBookings([]);
+        return;
+      }
+
+      // Get unique provider user IDs
+      const providerUserIds = [...new Set(bookingsData.map(booking => booking.provider_user_id))];
+
+      // Fetch provider profiles separately
+      const { data: providerProfiles, error: profilesError } = await supabase
+        .from('provider_profiles')
+        .select('user_id, business_name')
+        .in('user_id', providerUserIds);
+
+      if (profilesError) {
+        console.error('Error loading provider profiles:', profilesError);
+        // Continue without provider profiles rather than failing completely
+      }
+
+      // Create a map of provider profiles by user_id
+      const profilesMap = new Map();
+      if (providerProfiles) {
+        providerProfiles.forEach(profile => {
+          profilesMap.set(profile.user_id, profile);
+        });
+      }
+
+      // Combine the data
+      const enrichedBookings: Booking[] = bookingsData.map(booking => ({
         ...booking,
         services: booking.services || null,
-        provider_profiles: booking.provider_profiles || null
+        provider_profiles: profilesMap.get(booking.provider_user_id) || null
       }));
-      setBookings(bookingsData);
+
+      console.log('Loaded bookings with enhanced data:', enrichedBookings);
+      setBookings(enrichedBookings);
     } catch (error) {
       console.error('Error loading bookings:', error);
       toast({
