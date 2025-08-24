@@ -158,23 +158,18 @@ const Checkout = () => {
                   <div key={index}>
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-foreground">{item.title}</h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+                        <h3 className="font-semibold text-foreground">{item.service_title}</h3>
                         <div className="flex items-center gap-2 mt-2">
-                          <Badge variant="secondary">{item.category}</Badge>
                           <span className="text-xs text-muted-foreground">
                             {item.duration_minutes} minutes
                           </span>
                         </div>
-                        {item.provider_profile && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            By {item.provider_profile.business_name}
-                          </p>
-                        )}
+                        <p className="text-sm text-muted-foreground mt-1">
+                          By {item.provider_name}
+                        </p>
                       </div>
                       <div className="text-right ml-4">
-                        <p className="font-semibold text-lg">${item.base_price}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{item.price_type}</p>
+                        <p className="font-semibold text-lg">${item.price}</p>
                       </div>
                     </div>
                     {index < items.length - 1 && <Separator className="mt-4" />}
