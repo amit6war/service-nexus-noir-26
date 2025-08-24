@@ -32,8 +32,8 @@ export const useBookingsActionsV2 = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Accept booking
-  const acceptBooking = useMutation({
+  // Accept booking options isolated to avoid deep generic inference
+  const acceptBookingOptions = {
     mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
       console.log('🔄 Accepting booking:', bookingId);
       
@@ -99,10 +99,13 @@ export const useBookingsActionsV2 = () => {
         variant: "destructive",
       });
     }
-  });
+  } as const;
 
-  // Mark in progress
-  const markInProgress = useMutation({
+  // Accept booking
+  const acceptBooking = useMutation(acceptBookingOptions as any);
+
+  // Mark in progress options isolated
+  const markInProgressOptions = {
     mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
       console.log('🔄 Marking booking in progress:', bookingId);
       
@@ -167,10 +170,13 @@ export const useBookingsActionsV2 = () => {
         variant: "destructive",
       });
     }
-  });
+  } as const;
 
-  // Complete booking
-  const completeBooking = useMutation({
+  // Mark in progress
+  const markInProgress = useMutation(markInProgressOptions as any);
+
+  // Complete booking options isolated
+  const completeBookingOptions = {
     mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
       console.log('🔄 Completing booking:', bookingId);
       
@@ -236,10 +242,13 @@ export const useBookingsActionsV2 = () => {
         variant: "destructive",
       });
     }
-  });
+  } as const;
 
-  // Cancel booking
-  const cancelBooking = useMutation({
+  // Complete booking
+  const completeBooking = useMutation(completeBookingOptions as any);
+
+  // Cancel booking options isolated
+  const cancelBookingOptions = {
     mutationFn: async ({ bookingId, reason }: CancelBookingParams) => {
       console.log('🔄 Cancelling booking:', bookingId, 'Reason:', reason);
       
@@ -305,7 +314,10 @@ export const useBookingsActionsV2 = () => {
         variant: "destructive",
       });
     }
-  });
+  } as const;
+
+  // Cancel booking
+  const cancelBooking = useMutation(cancelBookingOptions as any);
 
   return {
     acceptBooking,
