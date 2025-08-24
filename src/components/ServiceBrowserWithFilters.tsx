@@ -216,8 +216,14 @@ const ServiceBrowserWithFilters: React.FC<ServiceBrowserWithFiltersProps> = ({
           {filteredServices.map((service) => (
             <ServiceCard
               key={service.id}
-              service={service}
-              onClick={() => onServiceSelect?.(service)}
+              icon="🔧"
+              title={service.title}
+              provider={service.provider_profile?.business_name || 'Unknown Provider'}
+              rating={service.provider_profile?.rating || 0}
+              reviews={service.provider_profile?.total_reviews || 0}
+              price={service.price_type === 'hourly' ? `$${service.base_price}/hr` : `$${service.base_price}`}
+              location="Local Area"
+              image={service.images?.[0]}
             />
           ))}
         </div>
