@@ -158,15 +158,18 @@ export const useBookingsActions = () => {
         console.log('📝 Creating booking with confirmed status:', bookingData.booking_number);
   
         // Step 6: Create the booking
+        console.log('📊 Inserting booking data:', JSON.stringify(bookingData, null, 2));
+        
         const { data: createdBooking, error } = await supabase
           .from('bookings')
           .insert(bookingData)
           .select()
           .single();
-  
+
         if (error) {
           console.error('❌ Database error creating booking:', error);
-          throw new Error(`Database error: ${error.message} (Code: ${error.code})`);
+          console.error('❌ Booking data that failed:', bookingData);
+          throw new Error(`Database error: ${error.message} (Code: ${error.code}) - Details: ${error.details || 'No details'}`);
         }
   
         console.log('✅ Booking created successfully:', createdBooking.id, 'with status:', createdBooking.status);

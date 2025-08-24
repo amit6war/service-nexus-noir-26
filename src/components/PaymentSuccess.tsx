@@ -89,13 +89,13 @@ const PaymentSuccess = () => {
       // Clear cart and temp data AFTER successful booking creation
       console.log('🧹 Clearing cart and session data...');
       
-      // Clear session storage first
+      // Clear the cart first (localStorage)
+      clearCart();
+      
+      // Then clear session storage
       sessionStorage.removeItem('pendingCheckoutItems');
       sessionStorage.removeItem('pendingCheckoutAddress');
       sessionStorage.removeItem('checkoutTimestamp');
-      
-      // Then clear the cart
-      clearCart();
 
       // Set success state
       setBookingsCreated(true);
@@ -151,14 +151,19 @@ const PaymentSuccess = () => {
 
   // Only proceed when auth is ready and user is known
   useEffect(() => {
-    console.log('🚀 PaymentSuccess mounted. Auth loading:', authLoading, 'User:', !!user);
-    if (!authLoading && user?.id) {
+    const sessionId = searchParams.get('session_id');
+    console.log('🚀 PaymentSuccess mounted. Auth loading:', authLoading, 'User:', !!user, 'SessionId:', !!sessionId);
+    
+    if (!authLoading && user?.id && sessionId) {
       processPaymentSuccess();
     } else if (!authLoading && !user) {
       setError('You are not signed in. Please sign in to view your bookings.');
       setShowModal(true);
+    } else if (!authLoading && user?.id && !sessionId) {
+      setError('No payment session found. Please contact support if you were charged.');
+      setShowModal(true);
     }
-  }, [authLoading, user?.id]);
+  }, [authLoading, user?.id, searchParams]);
 
   // Show loading state if still processing
   if ((authLoading || creating) && !showModal) {

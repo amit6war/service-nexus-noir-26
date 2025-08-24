@@ -184,13 +184,25 @@ export const useShoppingCart = () => {
   }, []);
 
   const clearCart = useCallback(() => {
-    console.log('🧹 Clearing cart');
+    console.log('🧹 Clearing cart - current items:', items.length);
+    
+    // Clear localStorage immediately
+    try {
+      localStorage.removeItem(CART_STORAGE_KEY);
+      console.log('✅ Cart cleared from localStorage');
+    } catch (error) {
+      console.error('❌ Error clearing cart from localStorage:', error);
+    }
+    
+    // Clear state
     setItems([]);
+    console.log('✅ Cart state cleared');
+    
     toast({
       title: "Cart cleared",
       description: "All items have been removed from your cart",
     });
-  }, [toast]);
+  }, [items.length, toast]);
 
   const getTotalPrice = useCallback(() => {
     const total = items.reduce((sum, item) => sum + item.price, 0);
