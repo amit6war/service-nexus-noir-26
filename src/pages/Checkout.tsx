@@ -10,10 +10,12 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import AddressManager, { Address } from '@/components/AddressManager';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import EnhancedCheckoutItem from '@/components/EnhancedCheckoutItem';
 
 const Checkout = () => {
   const { items, getTotalPrice } = useShoppingCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -25,6 +27,17 @@ const Checkout = () => {
   };
 
   const handlePayment = async () => {
+    // Check authentication
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to proceed with checkout.',
+        variant: 'destructive'
+      });
+      navigate('/auth');
+      return;
+    }
+
     if (items.length === 0) {
       toast({
         title: 'Empty Cart',
@@ -56,14 +69,12 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      console.log('Creating enhanced Stripe checkout session with complete cart data...');
-
       const addressForCheckout = {
         address_line_1: selectedAddress.address_line_1,
         address_line_2: selectedAddress.address_line_2 || '',
         city: selectedAddress.city,
         state: selectedAddress.state,
-        zip_code: selectedAddress.postal_code, // Updated to match useBookingsActions
+        zip_code: selectedAddress.postal_code,
         country: selectedAddress.country
       };
 
@@ -94,7 +105,7 @@ const Checkout = () => {
         throw new Error('No checkout URL received');
       }
 
-      console.log('Redirecting to enhanced Stripe checkout...');
+      // Redirect to Stripe checkout
       window.location.href = data.url;
 
     } catch (error) {
@@ -225,7 +236,7 @@ const Checkout = () => {
 
               <Button
                 onClick={handlePayment}
-                disabled={loading || !selectedAddress}
+                disabled={loading || !selectedAddress || !user}
                 className="w-full h-14 text-lg bg-teal hover:bg-teal/90"
                 size="lg"
               >
@@ -249,6 +260,12 @@ const Checkout = () => {
               {!selectedAddress && (
                 <p className="text-sm text-muted-foreground text-center">
                   Please select a service address to continue
+                </p>
+              )}
+              
+              {!user && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Please log in to complete your purchase
                 </p>
               )}
             </div>
