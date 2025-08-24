@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, User, Download, Star, CheckCircle, XCircle, AlertCircle, Edit, RotateCcw } from 'lucide-react';
@@ -17,7 +16,7 @@ interface Booking {
   id: string;
   booking_number: string;
   service_date: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'accepted' | 'in_progress' | 'disputed';
   final_price: number;
   duration_minutes: number;
   service_address: string;
@@ -26,13 +25,12 @@ interface Booking {
   created_at: string;
   provider_user_id: string;
   service_id?: string;
-  // We'll need to join with services and provider_profiles for full data
-  service?: {
+  services?: {
     title: string;
-  };
-  provider_profile?: {
+  }[];
+  provider_profiles?: {
     business_name: string;
-  };
+  }[];
 }
 
 const MyBookings = () => {
@@ -171,6 +169,7 @@ const MyBookings = () => {
   );
 
   const renderBookingCard = (booking: Booking, isPast: boolean = false) => {
+    // Fixed: Access first element of array since Supabase joins return arrays
     const serviceName = booking.services?.[0]?.title || 'Service';
     const providerName = booking.provider_profiles?.[0]?.business_name || 'Provider';
 
@@ -181,7 +180,7 @@ const MyBookings = () => {
             <div>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <span>{serviceName}</span>
-                <BookingStatusBadge status={booking.status} />
+                <BookingStatusBadge status={booking.status as 'pending' | 'confirmed' | 'completed' | 'cancelled'} />
               </CardTitle>
               <CardDescription>
                 Booking #{booking.booking_number} • Booked on {format(new Date(booking.created_at), 'PPP')}

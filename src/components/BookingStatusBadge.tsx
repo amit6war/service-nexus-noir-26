@@ -1,10 +1,10 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, Clock, XCircle, AlertCircle, PlayCircle, Shield } from 'lucide-react';
 
 interface BookingStatusBadgeProps {
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'accepted' | 'in_progress' | 'disputed';
   className?: string;
 }
 
@@ -38,6 +38,27 @@ const BookingStatusBadge: React.FC<BookingStatusBadgeProps> = ({ status, classNa
           icon: XCircle,
           label: 'Cancelled',
           className: 'bg-red-500 text-white'
+        };
+      case 'accepted':
+        return {
+          variant: 'default' as const,
+          icon: CheckCircle,
+          label: 'Accepted',
+          className: 'bg-teal-500 text-white'
+        };
+      case 'in_progress':
+        return {
+          variant: 'default' as const,
+          icon: PlayCircle,
+          label: 'In Progress',
+          className: 'bg-orange-500 text-white'
+        };
+      case 'disputed':
+        return {
+          variant: 'destructive' as const,
+          icon: Shield,
+          label: 'Disputed',
+          className: 'bg-red-600 text-white'
         };
       default:
         return {
