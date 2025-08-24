@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart, CreditCard, MapPin, CheckCircle, ArrowLeft } from 'lucide-react';
@@ -58,12 +57,28 @@ const Checkout = () => {
     try {
       console.log('Creating enhanced Stripe checkout session with complete cart data...');
 
+      // Get the current session to ensure we have a valid token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error('Authentication error:', sessionError);
+        toast({
+          title: 'Authentication Required',
+          description: 'Please log in to continue with checkout.',
+          variant: 'destructive'
+        });
+        navigate('/auth');
+        return;
+      }
+
+      console.log('User authenticated, proceeding with checkout...');
+
       const addressForCheckout = {
         address_line_1: selectedAddress.address_line_1,
         address_line_2: selectedAddress.address_line_2 || '',
         city: selectedAddress.city,
         state: selectedAddress.state,
-        zip_code: selectedAddress.postal_code, // Updated to match useBookingsActions
+        zip_code: selectedAddress.postal_code,
         country: selectedAddress.country
       };
 
@@ -78,6 +93,7 @@ const Checkout = () => {
       sessionStorage.setItem('pendingCheckoutAddress', JSON.stringify(checkoutData.address));
       sessionStorage.setItem('checkoutTimestamp', checkoutData.timestamp.toString());
 
+      console.log('Calling create-checkout function...');
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           items: items,
@@ -87,11 +103,11 @@ const Checkout = () => {
 
       if (error) {
         console.error('Checkout error:', error);
-        throw error;
+        throw new Error(error.message || 'Failed to create checkout session');
       }
 
       if (!data?.url) {
-        throw new Error('No checkout URL received');
+        throw new Error('No checkout URL received from server');
       }
 
       console.log('Redirecting to enhanced Stripe checkout...');
@@ -99,9 +115,10 @@ const Checkout = () => {
 
     } catch (error) {
       console.error('Payment error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: 'Payment Failed',
-        description: 'There was an error processing your payment. Please try again.',
+        description: `There was an error processing your payment: ${errorMessage}. Please try again.`,
         variant: 'destructive'
       });
     } finally {
