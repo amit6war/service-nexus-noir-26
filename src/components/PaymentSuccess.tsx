@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
@@ -78,32 +79,29 @@ const PaymentSuccess = () => {
   
       console.log('📝 Creating bookings with items:', items.length, 'address:', address, 'sessionId:', sessionId);
   
-      const success = await createBookingsFromCart(items, address, sessionId);
+      await createBookingsFromCart(items, address, sessionId);
   
-      if (success !== undefined) {
-        console.log('✅ Bookings created and payments linked successfully');
-  
-        // Mark processed to avoid duplicates on refresh
-        sessionStorage.setItem(PAYMENT_PROCESSED_FLAG, 'true');
-  
-        // Clear cart and temp data
-        clearCart();
-        sessionStorage.removeItem('pendingCheckoutItems');
-        sessionStorage.removeItem('pendingCheckoutAddress');
-        sessionStorage.removeItem('checkoutTimestamp');
-  
-        setBookingsCreated(true);
-        setShowModal(true);
-  
-        toast({
-          title: 'Payment & Booking Successful!',
-          description: `${items.length} booking${items.length !== 1 ? 's' : ''} created and linked to payment successfully.`,
-        });
-  
-        console.log('🎉 Payment success process completed with proper linkage');
-      } else {
-        throw new Error('Failed to create bookings after payment');
-      }
+      console.log('✅ Bookings created and payments linked successfully');
+
+      // Mark processed to avoid duplicates on refresh
+      sessionStorage.setItem(PAYMENT_PROCESSED_FLAG, 'true');
+
+      // Clear cart and temp data immediately after successful booking creation
+      console.log('🧹 Clearing cart and session data...');
+      clearCart();
+      sessionStorage.removeItem('pendingCheckoutItems');
+      sessionStorage.removeItem('pendingCheckoutAddress');
+      sessionStorage.removeItem('checkoutTimestamp');
+
+      setBookingsCreated(true);
+      setShowModal(true);
+
+      toast({
+        title: 'Payment & Booking Successful!',
+        description: `${items.length} booking${items.length !== 1 ? 's' : ''} created with confirmed status.`,
+      });
+
+      console.log('🎉 Payment success process completed with proper linkage');
     } catch (err) {
       const friendly = formatError(err);
       console.error('❌ Error creating bookings after payment:', err, '->', friendly);

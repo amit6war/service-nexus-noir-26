@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -142,7 +143,7 @@ export const useBookingsActions = () => {
         const postalCode = address.postal_code || address.zip_code || '';
         const serviceAddress = `${address.address_line_1}${address.address_line_2 ? ', ' + address.address_line_2 : ''}, ${address.city}, ${address.state} ${postalCode}`;
   
-        // Step 5: Prepare booking data with validation
+        // Step 5: Prepare booking data with CONFIRMED status (not pending)
         const bookingData: Database['public']['Tables']['bookings']['Insert'] = {
           customer_id: user.id,
           provider_user_id: actualProviderId,
@@ -154,17 +155,15 @@ export const useBookingsActions = () => {
           provider_earnings: Math.round(Number(item.price) * 0.9 * 100) / 100,
           special_instructions: item.special_instructions || null,
           service_address: serviceAddress,
-
           service_city: address.city,
           service_state: address.state,
           service_zip: address.postal_code,
           booking_number: generateBookingNumber(),
           status: 'confirmed', // Set as confirmed after payment
           confirmed_at: new Date().toISOString()
-
         };
   
-        console.log('📝 Creating booking with data:', {
+        console.log('📝 Creating booking with confirmed status:', {
           ...bookingData,
           service_date: new Date(bookingData.service_date).toISOString(),
           final_price: bookingData.final_price,
@@ -180,7 +179,6 @@ export const useBookingsActions = () => {
           .single();
   
         if (error) {
-
           console.error('❌ Database error creating booking:', {
             error,
             code: error.code,
@@ -189,10 +187,9 @@ export const useBookingsActions = () => {
             hint: error.hint
           });
           throw new Error(`Database error: ${error.message} (Code: ${error.code})`);
-
         }
   
-        console.log('✅ Booking created successfully:', createdBooking.id);
+        console.log('✅ Booking created successfully with confirmed status:', createdBooking.id);
   
         // Step 7: Link payment to booking if payment exists
         if (paymentRecord && createdBooking) {
@@ -221,18 +218,16 @@ export const useBookingsActions = () => {
   
       const createdBookings = await Promise.all(bookingPromises);
       
-      console.log('🎉 All bookings created and linked successfully:', createdBookings.length);
+      console.log('🎉 All bookings created and linked successfully with confirmed status:', createdBookings.length);
       return;
   
     } catch (error) {
       const msg = formatError(error);
-
       console.error('❌ Error in createBookingsFromCart:', {
         error,
         message: msg,
         stack: error instanceof Error ? error.stack : undefined
       });
-
       throw new Error(msg);
     } finally {
       setLoading(false);
@@ -327,27 +322,4 @@ export const useBookingsActions = () => {
     cancelBooking,
     loading,
   };
-};
-
-// Fix the payment-booking linkage we identified
-const createBookingsFromCart = async (sessionId: string) => {
-  // Find payment record
-  const { data: payment } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('stripe_session_id', sessionId)
-    .eq('payment_status', 'completed')
-    .single();
-
-  if (!payment) throw new Error('Payment not found');
-
-  // Create bookings with proper linkage
-  const bookingData = (cartItems: CartItem[]) => cartItems.map(item => ({
-    // ... existing fields ...
-    payment_id: payment.id, // Establish the relationship
-    status: 'confirmed'
-  }));
-
-  // Insert bookings and update payment with booking_id
-  // This addresses the idempotency and linkage issues
 };
