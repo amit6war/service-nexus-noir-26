@@ -39,13 +39,18 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
 
   // Generate available time slots
   const timeSlots = [
-    '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'
+    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
+    '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+    '17:00', '17:30', '18:00'
   ];
 
   // Mock booked slots - simulating backend data
   const bookedSlots = [
     { provider_id: provider.id, date: format(new Date(), 'yyyy-MM-dd'), time: '10:00' },
     { provider_id: provider.id, date: format(addDays(new Date(), 1), 'yyyy-MM-dd'), time: '14:00' },
+    { provider_id: provider.id, date: format(addDays(new Date(), 2), 'yyyy-MM-dd'), time: '09:00' },
+    { provider_id: provider.id, date: format(addDays(new Date(), 2), 'yyyy-MM-dd'), time: '15:30' },
   ];
 
   const checkTimeSlotAvailability = (date: Date, time: string) => {
@@ -148,7 +153,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-card rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-card rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
       >
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
@@ -158,159 +163,173 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
             </Button>
           </div>
 
-          {/* Service & Provider Summary */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-teal/20 rounded-full flex items-center justify-center">
-                  <User className="w-6 h-6 text-teal" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">{provider.business_name}</h3>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                    <span>{provider.rating || 0}</span>
-                    <span>({provider.total_reviews || 0} reviews)</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Service & Provider Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-teal/20 rounded-full flex items-center justify-center">
+                    <User className="w-6 h-6 text-teal" />
                   </div>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Service:</span>
-                  <span>{service.title}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Duration:</span>
-                  <Badge variant="outline">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {service.duration_minutes} minutes
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Price:</span>
-                  <span className="text-xl font-bold text-teal">
-                    ${provider.price}
-                    {service.price_type === 'hourly' ? '/hr' : ''}
-                  </span>
-                </div>
-                {service.emergency_available && (
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Emergency Service:</span>
-                    <Badge variant="outline" className="text-red-500 border-red-500">
-                      Available
-                    </Badge>
+                  <div>
+                    <h3 className="font-semibold">{provider.business_name}</h3>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                      <span>{provider.rating || 0}</span>
+                      <span>({provider.total_reviews || 0} reviews)</span>
+                    </div>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Date Selection */}
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-3">
-                <Calendar className="w-4 h-4 inline mr-2" />
-                Select Date *
-              </label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold text-lg">{service.title}</h4>
+                    <p className="text-sm text-muted-foreground">{service.description}</p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">Duration:</span>
+                      <Badge variant="outline">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {service.duration_minutes} minutes
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">Price:</span>
+                      <span className="text-xl font-bold text-teal">
+                        ${provider.price}
+                        {service.price_type === 'hourly' ? '/hr' : ''}
+                      </span>
+                    </div>
+                    {service.emergency_available && (
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Emergency Service:</span>
+                        <Badge variant="outline" className="text-red-500 border-red-500">
+                          Available
+                        </Badge>
+                      </div>
                     )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    disabled={isDateDisabled}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* Time Slot Selection */}
-            {selectedDate && (
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-3">
-                  <Clock className="w-4 h-4 inline mr-2" />
-                  Select Time Slot *
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {timeSlots.map((time) => {
-                    const isAvailable = checkTimeSlotAvailability(selectedDate, time);
-                    const isSelected = selectedTimeSlot === time;
-                    
-                    return (
-                      <Button
-                        key={time}
-                        variant={isSelected ? "default" : "outline"}
-                        className={cn(
-                          "h-10",
-                          isSelected && "bg-teal hover:bg-teal/90",
-                          !isAvailable && "opacity-50 cursor-not-allowed"
-                        )}
-                        onClick={() => handleTimeSlotSelect(time)}
-                        disabled={!isAvailable}
-                      >
-                        {time}
-                        {!isAvailable && <span className="ml-1 text-xs">(Booked)</span>}
-                      </Button>
-                    );
-                  })}
-                </div>
-                
-                {conflictError && (
-                  <div className="flex items-center gap-2 mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-red-600" />
-                    <span className="text-sm text-red-600">{conflictError}</span>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* Special Instructions */}
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Special Instructions (Optional)
-              </label>
-              <Textarea
-                value={specialInstructions}
-                onChange={(e) => setSpecialInstructions(e.target.value)}
-                placeholder="Any specific requirements or notes for the service provider..."
-                className="w-full"
-                rows={3}
-              />
-            </div>
+            {/* Schedule Your Service */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Schedule Your Service</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {/* Date Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-3">
+                      <Calendar className="w-4 h-4 inline mr-2" />
+                      Select Date *
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !selectedDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={handleDateSelect}
+                          disabled={isDateDisabled}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={onClose}
-                className="flex-1"
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmBooking}
-                className="flex-1 bg-teal hover:bg-teal/90"
-                disabled={loading || !selectedDate || !selectedTimeSlot}
-              >
-                {loading ? 'Adding to Cart...' : 'Add to Cart'}
-              </Button>
-            </div>
+                  {/* Time Slot Selection */}
+                  {selectedDate && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-3">
+                        <Clock className="w-4 h-4 inline mr-2" />
+                        Select Time Slot *
+                      </label>
+                      <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                        {timeSlots.map((time) => {
+                          const isAvailable = checkTimeSlotAvailability(selectedDate, time);
+                          const isSelected = selectedTimeSlot === time;
+                          
+                          return (
+                            <Button
+                              key={time}
+                              variant={isSelected ? "default" : "outline"}
+                              size="sm"
+                              className={cn(
+                                "h-10",
+                                isSelected && "bg-teal hover:bg-teal/90",
+                                !isAvailable && "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                              )}
+                              onClick={() => handleTimeSlotSelect(time)}
+                              disabled={!isAvailable}
+                            >
+                              {time}
+                              {!isAvailable && <span className="ml-1 text-xs">(Booked)</span>}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      
+                      {conflictError && (
+                        <div className="flex items-center gap-2 mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <AlertCircle className="w-4 h-4 text-red-600" />
+                          <span className="text-sm text-red-600">{conflictError}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Special Instructions */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Special Instructions (Optional)
+                    </label>
+                    <Textarea
+                      value={specialInstructions}
+                      onChange={(e) => setSpecialInstructions(e.target.value)}
+                      placeholder="Any specific requirements or notes for the service provider..."
+                      className="w-full"
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={onClose}
+                      className="flex-1"
+                      disabled={loading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleConfirmBooking}
+                      className="flex-1 bg-teal hover:bg-teal/90"
+                      disabled={loading || !selectedDate || !selectedTimeSlot}
+                    >
+                      {loading ? 'Adding to Cart...' : 'Add to Cart'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </motion.div>
