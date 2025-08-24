@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, User, Download, Star, CheckCircle, XCircle, AlertCircle, Edit, RotateCcw } from 'lucide-react';
@@ -50,7 +49,7 @@ const MyBookings = () => {
     try {
       setLoading(true);
       
-      // Updated query to use the correct foreign key relationship
+      // Query with manual join condition
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -59,11 +58,12 @@ const MyBookings = () => {
             title,
             provider_id
           ),
-          provider_profiles!bookings_provider_user_id_fkey (
+          provider_profiles!inner (
             business_name
           )
         `)
         .eq('customer_id', user.id)
+        .eq('provider_profiles.user_id', 'bookings.provider_user_id')
         .order('service_date', { ascending: false });
 
       if (error) {
