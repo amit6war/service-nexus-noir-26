@@ -18,6 +18,15 @@ export interface CartItem {
   special_instructions?: string;
 }
 
+// Generate a compact booking number that always fits in VARCHAR(20)
+const generateBookingNumber = () => {
+  // Format: BK + base36(timestamp) + 4 random chars (uppercase), no separators
+  const ts = Date.now().toString(36).toUpperCase(); // ~8-10 chars
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase(); // 4 chars
+  const code = `BK${ts}${rand}`; // ~14-16 chars, well under 20
+  return code.length <= 20 ? code : code.slice(0, 20);
+};
+
 export const useBookingsActions = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -90,7 +99,7 @@ export const useBookingsActions = () => {
           service_city: address.city,
           service_state: address.state,
           service_zip: address.postal_code,
-          booking_number: `BK-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+          booking_number: generateBookingNumber(), // FIX: ensure <= VARCHAR(20)
         };
 
         console.log('📝 Creating booking with data:', bookingData);
