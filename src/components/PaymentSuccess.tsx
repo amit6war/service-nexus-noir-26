@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Calendar, User, AlertCircle, RefreshCw } from 'lucide-react';
@@ -99,11 +98,11 @@ const PaymentSuccess = () => {
   };
 
   const handleViewBookings = () => {
-    navigate('/dashboard?tab=bookings');
+    navigate('/customer-dashboard?tab=bookings');
   };
 
   const handleViewDashboard = () => {
-    navigate('/dashboard');
+    navigate('/customer-dashboard');
   };
 
   useEffect(() => {
