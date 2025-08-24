@@ -1,6 +1,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatError } from "@/lib/errorFormatter";
 
 const FUNCTIONS_BASE = "https://jpvjdpgtpjbrkcamyqie.supabase.co/functions/v1";
 
@@ -48,13 +49,18 @@ export const useReservationTimer = (expiresAt?: string | null) => {
 
 export const useSlotBooking = () => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const reserveSlot = async (params: { slotId: string; holdMinutes?: number; }): Promise<ReservationResult> => {
     const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error("Not authenticated");
+    if (!session) throw new Error("Please log in to book a slot");
 
     setLoading(true);
+    setError(null);
+    
     try {
+      console.log('🔄 Reserving slot:', params);
+      
       const res = await fetch(`${FUNCTIONS_BASE}/reserve`, {
         method: "POST",
         headers: {
@@ -65,10 +71,24 @@ export const useSlotBooking = () => {
       });
 
       const json = await res.json();
+      
       if (!res.ok) {
-        throw new Error(json?.error || "Failed to reserve slot");
+        const errorMsg = json?.error || `HTTP ${res.status}: Failed to reserve slot`;
+        console.error('❌ Reserve slot failed:', errorMsg);
+        throw new Error(errorMsg);
       }
-      return { reservationId: json.reservationId, holdExpiresAt: json.holdExpiresAt };
+      
+      console.log('✅ Slot reserved successfully:', json);
+      return { 
+        reservationId: json.reservationId, 
+        holdExpiresAt: json.holdExpiresAt 
+      };
+      
+    } catch (error) {
+      const errorMsg = formatError(error);
+      console.error('❌ Reserve slot error:', errorMsg);
+      setError(errorMsg);
+      throw new Error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -76,10 +96,14 @@ export const useSlotBooking = () => {
 
   const initiateCheckout = async (reservationId: string): Promise<{ url: string; sessionId: string; }> => {
     const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error("Not authenticated");
+    if (!session) throw new Error("Please log in to proceed with payment");
 
     setLoading(true);
+    setError(null);
+    
     try {
+      console.log('💳 Initiating checkout for reservation:', reservationId);
+      
       const origin = window.location.origin;
       const res = await fetch(`${FUNCTIONS_BASE}/pay`, {
         method: "POST",
@@ -90,43 +114,114 @@ export const useSlotBooking = () => {
         body: JSON.stringify({
           reservationId,
           successUrl: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${origin}/checkout`,
+          cancelUrl: `${origin}/`,
         }),
       });
 
       const json = await res.json();
+      
       if (!res.ok) {
-        throw new Error(json?.error || "Failed to create checkout session");
+        const errorMsg = json?.error || `HTTP ${res.status}: Failed to create checkout session`;
+        console.error('❌ Checkout failed:', errorMsg);
+        throw new Error(errorMsg);
       }
+      
+      console.log('✅ Checkout session created:', json);
       return { url: json.url, sessionId: json.sessionId };
+      
+    } catch (error) {
+      const errorMsg = formatError(error);
+      console.error('❌ Checkout error:', errorMsg);
+      setError(errorMsg);
+      throw new Error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  // Realtime subscription for events table
+  // Enhanced realtime subscription with error handling
   const subscribeToEvents = (onEvent: (payload: any) => void) => {
+    console.log('🔔 Subscribing to real-time events');
+    
     const channel = supabase
-      .channel("events")
+      .channel("slot_booking_events")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "events" },
         (payload) => {
-          console.log("[events] new event", payload);
-          onEvent?.(payload.new);
+          console.log('📡 Real-time event received:', payload.new);
+          try {
+            onEvent(payload.new);
+          } catch (error) {
+            console.error('❌ Error handling real-time event:', error);
+          }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('🔗 Realtime subscription status:', status);
+      });
 
     return () => {
+      console.log('🔌 Unsubscribing from real-time events');
       supabase.removeChannel(channel);
     };
   };
 
+  // Utility function to check slot availability
+  const checkSlotAvailability = async (slotId: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from('slots')
+        .select('status')
+        .eq('id', slotId)
+        .single();
+
+      if (error) throw error;
+      return data?.status === 'AVAILABLE';
+    } catch (error) {
+      console.error('❌ Error checking slot availability:', error);
+      return false;
+    }
+  };
+
+  // Get user's active reservations
+  const getActiveReservations = async () => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) return [];
+
+      const { data, error } = await supabase
+        .from('reservations')
+        .select(`
+          id,
+          slot_id,
+          status,
+          hold_expires_at,
+          slots (
+            start_time,
+            end_time,
+            services (title)
+          )
+        `)
+        .eq('user_id', session.session.user.id)
+        .eq('status', 'HOLD')
+        .gt('hold_expires_at', new Date().toISOString());
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('❌ Error fetching active reservations:', error);
+      return [];
+    }
+  };
+
   return {
     loading,
+    error,
     reserveSlot,
     initiateCheckout,
     subscribeToEvents,
+    checkSlotAvailability,
+    getActiveReservations,
   };
 };
