@@ -76,8 +76,13 @@ const MyBookings = () => {
       }
 
       console.log('Loaded bookings with enhanced data:', data);
-      // Type assertion to handle the Supabase response properly
-      setBookings(data as Booking[] || []);
+      // Convert the Supabase response to our Booking type
+      const bookingsData: Booking[] = (data || []).map(booking => ({
+        ...booking,
+        services: booking.services || null,
+        provider_profiles: booking.provider_profiles || null
+      }));
+      setBookings(bookingsData);
     } catch (error) {
       console.error('Error loading bookings:', error);
       toast({
