@@ -9,15 +9,13 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("Starting checkout session creation...");
+    console.log("Enhanced checkout session creation starting...");
 
-    // Get the request body
     const { items, address } = await req.json();
     console.log("Received items:", items?.length, "Address provided:", !!address);
 
@@ -29,13 +27,19 @@ serve(async (req) => {
       throw new Error("No address provided");
     }
 
-    // Create Supabase client using the anon key for user authentication
+    // Validate all items have required fields
+    for (const item of items) {
+      if (!item.service_title || !item.provider_name || !item.price || !item.scheduled_date) {
+        console.error("Invalid item data:", item);
+        throw new Error("Invalid item data - missing required fields");
+      }
+    }
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
-    // Get authenticated user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("No authorization header");
@@ -50,12 +54,10 @@ serve(async (req) => {
 
     console.log("User authenticated:", userData.user.email);
 
-    // Initialize Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
 
-    // Check if customer exists in Stripe
     const customers = await stripe.customers.list({ 
       email: userData.user.email!, 
       limit: 1 
@@ -69,41 +71,51 @@ serve(async (req) => {
       console.log("Creating new customer");
     }
 
-    // Create line items for Stripe
+    // Create enhanced line items with complete service information
     const lineItems = items.map((item: any) => ({
       price_data: {
         currency: "usd",
         product_data: {
-          name: item.service_title,
-          description: `Service by ${item.provider_name}`,
+          name: `${item.service_title}`,
+          description: `Service by ${item.provider_name} scheduled for ${new Date(item.scheduled_date).toLocaleDateString()}`,
+          metadata: {
+            service_id: item.service_id,
+            provider_id: item.provider_id,
+            scheduled_date: item.scheduled_date
+          }
         },
-        unit_amount: Math.round(item.price * 100), // Convert to cents
+        unit_amount: Math.round(item.price * 100),
       },
       quantity: 1,
     }));
 
-    console.log("Creating checkout session...");
+    console.log("Creating enhanced checkout session...");
 
-    // Build compact metadata to stay well under Stripe's 500-char per value limit
-    const compactItemIds = items.map((i: any) => String(i.service_id)).slice(0, 20).join("|"); // cap to 20 ids for safety
+    // Store essential data in metadata (staying within Stripe limits)
+    const checkoutMetadata = {
+      user_id: userData.user.id,
+      items_count: String(items.length),
+      total_amount: String(items.reduce((sum: number, item: any) => sum + item.price, 0)),
+      checkout_timestamp: String(Date.now()),
+      // Store first item details as sample
+      first_service_id: items[0]?.service_id || '',
+      first_provider_id: items[0]?.provider_id || ''
+    };
 
-    // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : userData.user.email,
       line_items: lineItems,
       mode: "payment",
-      success_url: `${req.headers.get("origin")}/customer-dashboard?payment=success`,
+      success_url: `${req.headers.get("origin")}/payment-success`,
       cancel_url: `${req.headers.get("origin")}/checkout?payment=cancelled`,
-      metadata: {
-        user_id: userData.user.id,
-        item_ids: compactItemIds,
-        item_count: String(items.length),
-        // address and full cart details intentionally omitted to avoid Stripe metadata limits
+      metadata: checkoutMetadata,
+      payment_intent_data: {
+        metadata: checkoutMetadata // Also store in payment intent
       }
     });
 
-    console.log("Checkout session created:", session.id);
+    console.log("Enhanced checkout session created successfully:", session.id);
 
     return new Response(JSON.stringify({ 
       url: session.url,
@@ -114,7 +126,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Error creating checkout session:", error);
+    console.error("Error creating enhanced checkout session:", error);
     return new Response(JSON.stringify({ 
       error: error instanceof Error ? error.message : "Unknown error" 
     }), {

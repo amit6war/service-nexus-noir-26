@@ -1,19 +1,19 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCart, CreditCard, MapPin, Calendar, Clock, User, CheckCircle, ArrowLeft } from 'lucide-react';
+import { ShoppingCart, CreditCard, MapPin, CheckCircle, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
 import AddressManager, { Address } from '@/components/AddressManager';
 import { supabase } from '@/integrations/supabase/client';
+import EnhancedCheckoutItem from '@/components/EnhancedCheckoutItem';
 
 const Checkout = () => {
-  const { items, getTotalPrice } = useShoppingCart(); // Don't destructure clearCart here
+  const { items, getTotalPrice } = useShoppingCart();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -43,7 +43,6 @@ const Checkout = () => {
       return;
     }
 
-    // Validate that all items have scheduled dates
     const itemsWithoutDate = items.filter(item => !item.scheduled_date);
     if (itemsWithoutDate.length > 0) {
       toast({
@@ -57,19 +56,28 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      console.log('Creating Stripe checkout session...');
+      console.log('Creating enhanced Stripe checkout session with complete cart data...');
 
-      // Convert selected address to the format expected
       const addressForCheckout = {
         address_line_1: selectedAddress.address_line_1,
         address_line_2: selectedAddress.address_line_2 || '',
         city: selectedAddress.city,
         state: selectedAddress.state,
-        postal_code: selectedAddress.postal_code,
+        zip_code: selectedAddress.postal_code, // Updated to match useBookingsActions
         country: selectedAddress.country
       };
 
-      // Call the Stripe checkout edge function
+      // Store complete cart data in sessionStorage before payment
+      const checkoutData = {
+        items: items,
+        address: addressForCheckout,
+        timestamp: Date.now()
+      };
+      
+      sessionStorage.setItem('pendingCheckoutItems', JSON.stringify(checkoutData.items));
+      sessionStorage.setItem('pendingCheckoutAddress', JSON.stringify(checkoutData.address));
+      sessionStorage.setItem('checkoutTimestamp', checkoutData.timestamp.toString());
+
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           items: items,
@@ -86,13 +94,7 @@ const Checkout = () => {
         throw new Error('No checkout URL received');
       }
 
-      console.log('Redirecting to Stripe checkout...');
-      
-      // Store cart items in sessionStorage before redirecting (don't clear cart yet)
-      sessionStorage.setItem('pendingCheckoutItems', JSON.stringify(items));
-      sessionStorage.setItem('pendingCheckoutAddress', JSON.stringify(addressForCheckout));
-      
-      // Redirect to Stripe Checkout
+      console.log('Redirecting to enhanced Stripe checkout...');
       window.location.href = data.url;
 
     } catch (error) {
@@ -130,7 +132,6 @@ const Checkout = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          {/* Header with Back Button */}
           <div className="flex items-center gap-4 mb-8">
             <Button
               variant="ghost"
@@ -144,46 +145,18 @@ const Checkout = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Order Summary */}
+            {/* Enhanced Order Summary */}
             <div className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <ShoppingCart className="w-5 h-5" />
-                    Order Summary
+                    Order Summary ({items.length} service{items.length !== 1 ? 's' : ''})
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-start p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{item.service_title}</h3>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                          <User className="w-4 h-4" />
-                          <span>{item.provider_name}</span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{item.duration_minutes} min</span>
-                          </div>
-                          {item.scheduled_date && (
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              <span>{format(new Date(item.scheduled_date), 'MMM d, p')}</span>
-                            </div>
-                          )}
-                        </div>
-                        {item.special_instructions && (
-                          <p className="text-sm text-muted-foreground mt-2">
-                            <strong>Notes:</strong> {item.special_instructions}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <span className="text-lg font-bold text-teal">${item.price}</span>
-                      </div>
-                    </div>
+                    <EnhancedCheckoutItem key={item.id} item={item} />
                   ))}
                   
                   <Separator />
@@ -198,7 +171,6 @@ const Checkout = () => {
 
             {/* Service Address & Payment */}
             <div className="space-y-6">
-              {/* Service Address Selection */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -215,15 +187,24 @@ const Checkout = () => {
                 </CardContent>
               </Card>
 
-              {/* Payment Information */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="w-5 h-5" />
-                    Payment with Stripe
+                    Payment Method
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="p-4 border border-border rounded-lg bg-muted/20">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="w-5 h-5 text-teal" />
+                      <div>
+                        <div className="font-medium">Credit/Debit Card</div>
+                        <div className="text-sm text-muted-foreground">Secure payment via Stripe</div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <h4 className="font-semibold text-blue-800 mb-2">Test Payment Information</h4>
                     <div className="text-sm text-blue-700 space-y-1">
@@ -242,7 +223,6 @@ const Checkout = () => {
                 </CardContent>
               </Card>
 
-              {/* Payment Button */}
               <Button
                 onClick={handlePayment}
                 disabled={loading || !selectedAddress}
@@ -256,12 +236,12 @@ const Checkout = () => {
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
                     />
-                    Creating Checkout Session...
+                    Processing Payment...
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5" />
-                    Pay ${totalPrice} with Stripe
+                    Complete Payment - ${totalPrice}
                   </div>
                 )}
               </Button>
