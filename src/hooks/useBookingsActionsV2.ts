@@ -25,20 +25,23 @@ interface CancelBookingParams {
   reason: string;
 }
 
+// Lightweight mutation context to avoid deep types
+type MutationCtx = unknown;
+
 export const useBookingsActionsV2 = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  const acceptBooking = useMutation({
-    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
+  // Accept booking
+  const acceptBooking = useMutation<Booking, Error, { bookingId: string; notes?: string }, MutationCtx>({
+    mutationFn: async ({ bookingId, notes }) => {
       console.log('🔄 Accepting booking:', bookingId);
       
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Update booking status to accepted
-      const { data, error } = await supabase
+      const res = await supabase
         .from('bookings')
         .update({
           status: 'accepted',
@@ -47,15 +50,15 @@ export const useBookingsActionsV2 = () => {
         })
         .eq('id', bookingId)
         .eq('provider_id', user.id)
-        .select()
+        .select('*')
         .single();
 
-      if (error) {
-        console.error('❌ Error accepting booking:', error);
-        throw error;
+      if (res.error) {
+        console.error('❌ Error accepting booking:', res.error);
+        throw new Error(res.error.message);
       }
 
-      return data;
+      return res.data as unknown as Booking;
     },
     onSuccess: async (data) => {
       console.log('✅ Booking accepted successfully:', data);
@@ -98,16 +101,16 @@ export const useBookingsActionsV2 = () => {
     }
   });
 
-  const markInProgress = useMutation({
-    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
+  // Mark in progress
+  const markInProgress = useMutation<Booking, Error, { bookingId: string; notes?: string }, MutationCtx>({
+    mutationFn: async ({ bookingId, notes }) => {
       console.log('🔄 Marking booking in progress:', bookingId);
       
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Update booking status to in_progress
-      const { data, error } = await supabase
+      const res = await supabase
         .from('bookings')
         .update({
           status: 'in_progress',
@@ -115,15 +118,15 @@ export const useBookingsActionsV2 = () => {
         })
         .eq('id', bookingId)
         .eq('provider_id', user.id)
-        .select()
+        .select('*')
         .single();
 
-      if (error) {
-        console.error('❌ Error marking booking in progress:', error);
-        throw error;
+      if (res.error) {
+        console.error('❌ Error marking booking in progress:', res.error);
+        throw new Error(res.error.message);
       }
 
-      return data;
+      return res.data as unknown as Booking;
     },
     onSuccess: async (data) => {
       console.log('✅ Booking marked in progress successfully:', data);
@@ -166,16 +169,16 @@ export const useBookingsActionsV2 = () => {
     }
   });
 
-  const completeBooking = useMutation({
-    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
+  // Complete booking
+  const completeBooking = useMutation<Booking, Error, { bookingId: string; notes?: string }, MutationCtx>({
+    mutationFn: async ({ bookingId, notes }) => {
       console.log('🔄 Completing booking:', bookingId);
       
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Update booking status to completed
-      const { data, error } = await supabase
+      const res = await supabase
         .from('bookings')
         .update({
           status: 'completed',
@@ -184,15 +187,15 @@ export const useBookingsActionsV2 = () => {
         })
         .eq('id', bookingId)
         .eq('provider_id', user.id)
-        .select()
+        .select('*')
         .single();
 
-      if (error) {
-        console.error('❌ Error completing booking:', error);
-        throw error;
+      if (res.error) {
+        console.error('❌ Error completing booking:', res.error);
+        throw new Error(res.error.message);
       }
 
-      return data;
+      return res.data as unknown as Booking;
     },
     onSuccess: async (data) => {
       console.log('✅ Booking completed successfully:', data);
@@ -235,16 +238,16 @@ export const useBookingsActionsV2 = () => {
     }
   });
 
-  const cancelBooking = useMutation({
-    mutationFn: async ({ bookingId, reason }: CancelBookingParams) => {
+  // Cancel booking
+  const cancelBooking = useMutation<Booking, Error, CancelBookingParams, MutationCtx>({
+    mutationFn: async ({ bookingId, reason }) => {
       console.log('🔄 Cancelling booking:', bookingId, 'Reason:', reason);
       
       if (!user) {
         throw new Error('User not authenticated');
       }
 
-      // Update booking status to cancelled
-      const { data, error } = await supabase
+      const res = await supabase
         .from('bookings')
         .update({
           status: 'cancelled',
@@ -253,15 +256,15 @@ export const useBookingsActionsV2 = () => {
         })
         .eq('id', bookingId)
         .eq('customer_id', user.id)
-        .select()
+        .select('*')
         .single();
 
-      if (error) {
-        console.error('❌ Error cancelling booking:', error);
-        throw error;
+      if (res.error) {
+        console.error('❌ Error cancelling booking:', res.error);
+        throw new Error(res.error.message);
       }
 
-      return data;
+      return res.data as unknown as Booking;
     },
     onSuccess: async (data) => {
       console.log('✅ Booking cancelled successfully:', data);
