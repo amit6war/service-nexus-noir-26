@@ -6,32 +6,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { ProviderApplication, VerificationDocument, VerificationStatus, DocumentType } from '@/types/verification';
 
-interface ProviderApplication {
-  id: string;
-  user_id: string;
-  business_name?: string;
-  verification_status: 'pending' | 'approved' | 'rejected';
-  created_at: string;
-  profiles?: {
-    first_name?: string;
-    last_name?: string;
-  };
-  documents: VerificationDocument[];
-}
-
-interface VerificationDocument {
-  id: string;
-  document_type: string;
-  file_name: string;
-  file_path: string;
-  verification_status: 'pending' | 'approved' | 'rejected';
-  admin_notes?: string;
-  created_at: string;
-}
+const DOCUMENT_TYPES: Array<{ value: DocumentType; label: string }> = [
+  { value: 'business_license', label: 'Business License' },
+  { value: 'insurance_certificate', label: 'Insurance Certificate' },
+  { value: 'id_proof', label: 'Government ID' },
+  { value: 'professional_certification', label: 'Professional Certifications' },
+  { value: 'background_check', label: 'Background Check' }
+];
 
 const AdminVerificationPanel = () => {
   const { user } = useAuth();
@@ -74,8 +61,8 @@ const AdminVerificationPanel = () => {
 
           return {
             ...provider,
-            documents: documentsData || []
-          };
+            documents: (documentsData || []) as VerificationDocument[]
+          } as ProviderApplication;
         })
       );
 
@@ -97,7 +84,7 @@ const AdminVerificationPanel = () => {
       const { error } = await supabase
         .from('provider_profiles')
         .update({
-          verification_status: status,
+          verification_status: status as VerificationStatus,
           verified_at: status === 'approved' ? new Date().toISOString() : null
         })
         .eq('user_id', providerId);
@@ -140,7 +127,7 @@ const AdminVerificationPanel = () => {
       const { error } = await supabase
         .from('verification_documents')
         .update({
-          verification_status: status,
+          verification_status: status as VerificationStatus,
           admin_notes: notes,
           reviewed_at: new Date().toISOString(),
           reviewed_by: user?.id
@@ -193,7 +180,7 @@ const AdminVerificationPanel = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: VerificationStatus) => {
     switch (status) {
       case 'approved':
         return <CheckCircle className="w-5 h-5 text-green-600" />;
@@ -204,7 +191,7 @@ const AdminVerificationPanel = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: VerificationStatus) => {
     switch (status) {
       case 'approved':
         return 'text-green-600 bg-green-50 border-green-200';
@@ -222,7 +209,7 @@ const AdminVerificationPanel = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
       </div>
     );
   }

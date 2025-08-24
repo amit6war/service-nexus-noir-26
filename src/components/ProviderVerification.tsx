@@ -4,41 +4,18 @@ import { motion } from 'framer-motion';
 import { Upload, FileText, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { ProviderProfile, VerificationDocument, DocumentType, VerificationStatus } from '@/types/verification';
 
-const DOCUMENT_TYPES = [
+const DOCUMENT_TYPES: Array<{ value: DocumentType; label: string }> = [
   { value: 'business_license', label: 'Business License' },
   { value: 'insurance_certificate', label: 'Insurance Certificate' },
-  { value: 'identification', label: 'Government ID' },
-  { value: 'certifications', label: 'Professional Certifications' },
-  { value: 'tax_documents', label: 'Tax Documents' }
+  { value: 'id_proof', label: 'Government ID' },
+  { value: 'professional_certification', label: 'Professional Certifications' },
+  { value: 'background_check', label: 'Background Check' }
 ];
-
-interface ProviderProfile {
-  id: string;
-  verification_status: 'pending' | 'approved' | 'rejected';
-  business_name?: string;
-  business_address?: string;
-  business_phone?: string;
-  business_email?: string;
-  years_experience?: number;
-  description?: string;
-}
-
-interface VerificationDocument {
-  id: string;
-  document_type: string;
-  file_name: string;
-  verification_status: 'pending' | 'approved' | 'rejected';
-  admin_notes?: string;
-  created_at: string;
-}
 
 const ProviderVerification = () => {
   const { user } = useAuth();
@@ -73,7 +50,9 @@ const ProviderVerification = () => {
         throw profileError;
       }
 
-      setProfile(profileData);
+      if (profileData) {
+        setProfile(profileData as ProviderProfile);
+      }
 
       // Load verification documents
       const { data: documentsData, error: documentsError } = await supabase
@@ -87,7 +66,7 @@ const ProviderVerification = () => {
         throw documentsError;
       }
 
-      setDocuments(documentsData || []);
+      setDocuments((documentsData || []) as VerificationDocument[]);
     } catch (error) {
       console.error('Error loading provider data:', error);
       toast({
@@ -100,7 +79,7 @@ const ProviderVerification = () => {
     }
   };
 
-  const handleFileUpload = async (documentType: string, file: File) => {
+  const handleFileUpload = async (documentType: DocumentType, file: File) => {
     if (!user?.id) return;
 
     try {
@@ -129,7 +108,7 @@ const ProviderVerification = () => {
           file_path: fileName,
           file_size: file.size,
           mime_type: file.type,
-          verification_status: 'pending'
+          verification_status: 'pending' as VerificationStatus
         });
 
       if (insertError) {
@@ -156,7 +135,7 @@ const ProviderVerification = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: VerificationStatus) => {
     switch (status) {
       case 'approved':
         return <CheckCircle className="w-5 h-5 text-green-600" />;
@@ -167,7 +146,7 @@ const ProviderVerification = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: VerificationStatus) => {
     switch (status) {
       case 'approved':
         return 'text-green-600 bg-green-50 border-green-200';
@@ -178,7 +157,7 @@ const ProviderVerification = () => {
     }
   };
 
-  const getOverallStatus = () => {
+  const getOverallStatus = (): VerificationStatus => {
     if (!profile) return 'pending';
     return profile.verification_status;
   };
@@ -191,7 +170,7 @@ const ProviderVerification = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
       </div>
     );
   }
@@ -232,7 +211,7 @@ const ProviderVerification = () => {
               <h3 className="text-lg font-semibold mb-4">Required Documents</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {getRequiredDocuments().map((docType) => (
-                  <div key={docType.value} className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-teal transition-colors">
+                  <div key={docType.value} className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-teal-600 transition-colors">
                     <div className="text-center">
                       <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                       <h4 className="font-medium text-foreground">{docType.label}</h4>
