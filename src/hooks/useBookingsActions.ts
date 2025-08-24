@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,10 +19,9 @@ export interface CartItem {
 
 // Generate a compact booking number that always fits in VARCHAR(20)
 const generateBookingNumber = () => {
-  // Format: BK + base36(timestamp) + 4 random chars (uppercase), no separators
-  const ts = Date.now().toString(36).toUpperCase(); // ~8-10 chars
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase(); // 4 chars
-  const code = `BK${ts}${rand}`; // ~14-16 chars, well under 20
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  const code = `BK${ts}${rand}`;
   return code.length <= 20 ? code : code.slice(0, 20);
 };
 
@@ -76,7 +74,11 @@ export const useBookingsActions = () => {
         }
       }
   
-      const bookingPromises = items.map(async (item, index) => {
+      const createdBookings = [];
+      
+      // Process bookings sequentially to avoid conflicts
+      for (let index = 0; index < items.length; index++) {
+        const item = items[index];
         console.log(`🔄 Processing item ${index + 1}/${items.length}:`, item.service_title);
   
         // Step 1: Validate and get actual provider ID
@@ -90,13 +92,8 @@ export const useBookingsActions = () => {
             .eq('id', item.service_id)
             .single();
   
-          if (serviceError) {
-            console.error('❌ Error fetching service provider:', serviceError);
-            throw new Error(`Failed to get provider for service ${item.service_title}: ${serviceError.message}`);
-          }
-  
-          if (!serviceData) {
-            throw new Error(`Service not found: ${item.service_title}`);
+          if (serviceError || !serviceData) {
+            throw new Error(`Failed to get provider for service ${item.service_title}: ${serviceError?.message}`);
           }
   
           actualProviderId = serviceData.provider_id as string;
@@ -111,12 +108,7 @@ export const useBookingsActions = () => {
           .eq('user_id', actualProviderId)
           .single();
   
-        if (providerError) {
-          console.error('❌ Provider validation error:', providerError);
-          throw new Error(`Provider validation failed for ${item.service_title}: ${providerError.message}`);
-        }
-  
-        if (!providerData) {
+        if (providerError || !providerData) {
           throw new Error(`Provider not found for service ${item.service_title}`);
         }
   
@@ -135,7 +127,6 @@ export const useBookingsActions = () => {
           .single();
   
         if (serviceCheckError) {
-          console.error('❌ Service validation error:', serviceCheckError);
           throw new Error(`Service validation failed: ${serviceCheckError.message}`);
         }
   
@@ -143,7 +134,8 @@ export const useBookingsActions = () => {
         const postalCode = address.postal_code || address.zip_code || '';
         const serviceAddress = `${address.address_line_1}${address.address_line_2 ? ', ' + address.address_line_2 : ''}, ${address.city}, ${address.state} ${postalCode}`;
   
-        // Step 5: Prepare booking data with CONFIRMED status (not pending)
+        // Step 5: Prepare booking data with CONFIRMED status immediately
+        const now = new Date().toISOString();
         const bookingData: Database['public']['Tables']['bookings']['Insert'] = {
           customer_id: user.id,
           provider_user_id: actualProviderId,
@@ -159,17 +151,11 @@ export const useBookingsActions = () => {
           service_state: address.state,
           service_zip: address.postal_code,
           booking_number: generateBookingNumber(),
-          status: 'confirmed', // Set as confirmed after payment
-          confirmed_at: new Date().toISOString()
+          status: 'confirmed', // Set as confirmed immediately after payment
+          confirmed_at: now
         };
   
-        console.log('📝 Creating booking with confirmed status:', {
-          ...bookingData,
-          service_date: new Date(bookingData.service_date).toISOString(),
-          final_price: bookingData.final_price,
-          platform_fee: bookingData.platform_fee,
-          payment_id: paymentRecord?.id
-        });
+        console.log('📝 Creating booking with confirmed status:', bookingData.booking_number);
   
         // Step 6: Create the booking
         const { data: createdBooking, error } = await supabase
@@ -179,17 +165,12 @@ export const useBookingsActions = () => {
           .single();
   
         if (error) {
-          console.error('❌ Database error creating booking:', {
-            error,
-            code: error.code,
-            message: error.message,
-            details: error.details,
-            hint: error.hint
-          });
+          console.error('❌ Database error creating booking:', error);
           throw new Error(`Database error: ${error.message} (Code: ${error.code})`);
         }
   
-        console.log('✅ Booking created successfully with confirmed status:', createdBooking.id);
+        console.log('✅ Booking created successfully:', createdBooking.id, 'with status:', createdBooking.status);
+        createdBookings.push(createdBooking);
   
         // Step 7: Link payment to booking if payment exists
         if (paymentRecord && createdBooking) {
@@ -200,25 +181,20 @@ export const useBookingsActions = () => {
             .update({ 
               booking_id: createdBooking.id,
               provider_user_id: actualProviderId,
-              updated_at: new Date().toISOString()
+              updated_at: now
             })
             .eq('id', paymentRecord.id);
   
           if (linkError) {
             console.error('❌ Error linking payment to booking:', linkError);
-            // Don't throw here - booking was created successfully
             console.warn('⚠️ Booking created but payment linkage failed. Manual intervention may be needed.');
           } else {
             console.log('✅ Payment successfully linked to booking');
           }
         }
-  
-        return createdBooking;
-      });
-  
-      const createdBookings = await Promise.all(bookingPromises);
+      }
       
-      console.log('🎉 All bookings created and linked successfully with confirmed status:', createdBookings.length);
+      console.log('🎉 All bookings created successfully:', createdBookings.length, 'bookings with confirmed status');
       return;
   
     } catch (error) {

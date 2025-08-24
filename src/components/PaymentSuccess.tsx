@@ -31,7 +31,6 @@ const PaymentSuccess = () => {
     // Guard if already processed in this session and not a retry
     if (!isRetry && (hasTriggeredRef.current || sessionStorage.getItem(PAYMENT_PROCESSED_FLAG) === 'true')) {
       console.log('ℹ️ Payment success already processed. Showing success state.');
-      // Show success state for already processed payments
       setBookingsCreated(true);
       setShowModal(true);
       return;
@@ -79,20 +78,26 @@ const PaymentSuccess = () => {
   
       console.log('📝 Creating bookings with items:', items.length, 'address:', address, 'sessionId:', sessionId);
   
+      // Create bookings with confirmed status
       await createBookingsFromCart(items, address, sessionId);
   
-      console.log('✅ Bookings created and payments linked successfully');
+      console.log('✅ Bookings created successfully with confirmed status');
 
       // Mark processed to avoid duplicates on refresh
       sessionStorage.setItem(PAYMENT_PROCESSED_FLAG, 'true');
 
-      // Clear cart and temp data immediately after successful booking creation
+      // Clear cart and temp data AFTER successful booking creation
       console.log('🧹 Clearing cart and session data...');
-      clearCart();
+      
+      // Clear session storage first
       sessionStorage.removeItem('pendingCheckoutItems');
       sessionStorage.removeItem('pendingCheckoutAddress');
       sessionStorage.removeItem('checkoutTimestamp');
+      
+      // Then clear the cart
+      clearCart();
 
+      // Set success state
       setBookingsCreated(true);
       setShowModal(true);
 
@@ -101,7 +106,7 @@ const PaymentSuccess = () => {
         description: `${items.length} booking${items.length !== 1 ? 's' : ''} created with confirmed status.`,
       });
 
-      console.log('🎉 Payment success process completed with proper linkage');
+      console.log('🎉 Payment success process completed successfully');
     } catch (err) {
       const friendly = formatError(err);
       console.error('❌ Error creating bookings after payment:', err, '->', friendly);
@@ -150,11 +155,9 @@ const PaymentSuccess = () => {
     if (!authLoading && user?.id) {
       processPaymentSuccess();
     } else if (!authLoading && !user) {
-      // If auth resolved and no user, show an actionable message
       setError('You are not signed in. Please sign in to view your bookings.');
       setShowModal(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user?.id]);
 
   // Show loading state if still processing
