@@ -33,11 +33,50 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
   const [loading, setLoading] = useState(false);
   const [conflictError, setConflictError] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
   
   const { addItem } = useShoppingCart();
   const { toast } = useToast();
 
   console.log('BookingFlow rendered with:', { service: service?.title, provider: provider?.business_name });
+
+  // Load real availability data from database
+  useEffect(() => {
+    const loadAvailability = async () => {
+      if (!provider?.user_id) return;
+      
+      setLoadingAvailability(true);
+      try {
+        // Get existing bookings for this provider
+        const { data: bookings, error } = await supabase
+          .from('bookings')
+          .select('service_date')
+          .eq('provider_user_id', provider.user_id)
+          .gte('service_date', new Date().toISOString())
+          .neq('status', 'cancelled');
+
+        if (error) {
+          console.error('Error loading availability:', error);
+          return;
+        }
+
+        // Transform bookings to booked slots format
+        const slots = (bookings || []).map(booking => ({
+          provider_id: provider.user_id,
+          date: format(new Date(booking.service_date), 'yyyy-MM-dd'),
+          time: format(new Date(booking.service_date), 'HH:mm')
+        }));
+
+        setBookedSlots(slots);
+      } catch (error) {
+        console.error('Error loading availability:', error);
+      } finally {
+        setLoadingAvailability(false);
+      }
+    };
+
+    loadAvailability();
+  }, [provider?.user_id]);
 
   // Generate available time slots
   const timeSlots = [
@@ -47,13 +86,8 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     '17:00', '17:30', '18:00'
   ];
 
-  // Mock booked slots - using real provider user_id
-  const bookedSlots = [
-    { provider_id: provider.user_id, date: format(new Date(), 'yyyy-MM-dd'), time: '10:00' },
-    { provider_id: provider.user_id, date: format(addDays(new Date(), 1), 'yyyy-MM-dd'), time: '14:00' },
-    { provider_id: provider.user_id, date: format(addDays(new Date(), 2), 'yyyy-MM-dd'), time: '09:00' },
-    { provider_id: provider.user_id, date: format(addDays(new Date(), 2), 'yyyy-MM-dd'), time: '15:30' },
-  ];
+  // Get real booked slots from database
+  const [bookedSlots, setBookedSlots] = useState<Array<{provider_id: string, date: string, time: string}>>([]);
 
   const checkTimeSlotAvailability = (date: Date, time: string) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -381,29 +415,37 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
                         <Clock className="w-4 h-4 inline mr-2" />
                         Select Time Slot *
                       </label>
-                      <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                        {timeSlots.map((time) => {
-                          const isAvailable = checkTimeSlotAvailability(selectedDate, time);
-                          const isSelected = selectedTimeSlot === time;
-                          
-                          return (
-                            <Button
-                              key={time}
-                              variant={isSelected ? "default" : "outline"}
-                              size="sm"
-                              className={cn(
-                                "h-10",
-                                isSelected && "bg-teal hover:bg-teal/90",
-                                !isAvailable && "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
-                              )}
-                              onClick={() => handleTimeSlotSelect(time)}
-                              disabled={!isAvailable}
-                            >
-                              {time}
-                              {!isAvailable && <span className="ml-1 text-xs">(Booked)</span>}
-                            </Button>
-                          );
-                        })}
+                       {loadingAvailability ? (
+                         <div className="flex items-center justify-center py-4">
+                           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal"></div>
+                           <span className="ml-2 text-sm text-muted-foreground">Loading availability...</span>
+                         </div>
+                       ) : (
+                         <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                           {timeSlots.map((time) => {
+                             const isAvailable = checkTimeSlotAvailability(selectedDate, time);
+                             const isSelected = selectedTimeSlot === time;
+                             
+                             return (
+                               <Button
+                                 key={time}
+                                 variant={isSelected ? "default" : "outline"}
+                                 size="sm"
+                                 className={cn(
+                                   "h-10",
+                                   isSelected && "bg-teal hover:bg-teal/90",
+                                   !isAvailable && "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                                 )}
+                                 onClick={() => handleTimeSlotSelect(time)}
+                                 disabled={!isAvailable}
+                               >
+                                 {time}
+                                 {!isAvailable && <span className="ml-1 text-xs">(Booked)</span>}
+                               </Button>
+                             );
+                           })}
+                         </div>
+                       )}
                       </div>
                       
                       {conflictError && (

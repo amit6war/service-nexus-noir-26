@@ -123,61 +123,74 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
     });
   };
 
-  // Mock providers data - in real app this would come from API
+  // Load real providers from database
   useEffect(() => {
     const loadProviders = async () => {
       setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const mockProviders = [
-        {
-          id: '1',
-          user_id: 'provider-1',
-          business_name: 'Elite Professional Services',
-          rating: 4.9,
-          total_reviews: 127,
-          years_experience: 8,
-          hourly_rate: selectedService.base_price * 0.8,
-          description: 'Experienced professional with excellent track record.',
-          verification_status: 'approved',
-          portfolio_images: ['/placeholder.svg'],
-          availability_schedule: { monday: '9:00-17:00', tuesday: '9:00-17:00' }
-        },
-        {
-          id: '2',
-          user_id: 'provider-2',
-          business_name: 'Quick Fix Professionals',
-          rating: 4.7,
-          total_reviews: 89,
-          years_experience: 5,
-          hourly_rate: selectedService.base_price * 0.9,
-          description: 'Fast and reliable service provider.',
-          verification_status: 'approved',
-          portfolio_images: ['/placeholder.svg'],
-          availability_schedule: { monday: '8:00-18:00', tuesday: '8:00-18:00' }
-        },
-        {
-          id: '3',
-          user_id: 'provider-3',
-          business_name: 'Expert Care Team',
-          rating: 4.6,
-          total_reviews: 156,
-          years_experience: 12,
-          hourly_rate: selectedService.base_price * 1.1,
-          description: 'Premium service with extensive experience.',
-          verification_status: 'approved',
-          portfolio_images: ['/placeholder.svg'],
-          availability_schedule: { monday: '10:00-16:00', tuesday: '10:00-16:00' }
+      try {
+        // Get approved provider profiles who are associated with this service
+        const { data: providerProfiles, error } = await supabase
+          .from('provider_profiles')
+          .select(`
+            user_id,
+            business_name,
+            rating,
+            total_reviews,
+            years_experience,
+            description,
+            verification_status,
+            portfolio_images,
+            hourly_rate
+          `)
+          .eq('verification_status', 'approved')
+          .limit(10);
+
+        if (error) {
+          console.error('Error loading providers:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to load providers. Please try again.',
+            variant: 'destructive'
+          });
+          setProviders([]);
+          setLoading(false);
+          return;
         }
-      ];
-      
-      setProviders(mockProviders);
-      setLoading(false);
+
+        // Transform the data to match the expected format
+        const transformedProviders = (providerProfiles || []).map(provider => ({
+          id: provider.user_id,
+          user_id: provider.user_id,
+          business_name: provider.business_name || 'Service Provider',
+          rating: provider.rating || 0,
+          total_reviews: provider.total_reviews || 0,
+          years_experience: provider.years_experience || 0,
+          hourly_rate: provider.hourly_rate || selectedService.base_price,
+          description: provider.description || 'Professional service provider',
+          verification_status: provider.verification_status,
+          portfolio_images: provider.portfolio_images || ['/placeholder.svg'],
+          availability_schedule: { monday: '9:00-17:00', tuesday: '9:00-17:00' }
+        }));
+
+        console.log('Loaded real providers:', transformedProviders);
+        setProviders(transformedProviders);
+        
+      } catch (error) {
+        console.error('Error loading providers:', error);
+        toast({
+          title: 'Error',
+          description: 'An unexpected error occurred while loading providers.',
+          variant: 'destructive'
+        });
+        setProviders([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
     loadProviders();
-  }, [selectedService]);
+  }, [selectedService, toast]);
 
   const handleProviderSelect = (provider: any) => {
     setSelectedProvider(provider);
