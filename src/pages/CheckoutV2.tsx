@@ -1,4 +1,5 @@
 
+// Enhanced Checkout page with production-grade validation and error handling
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart, CreditCard, MapPin, CheckCircle, ArrowLeft } from 'lucide-react';
@@ -12,8 +13,11 @@ import AddressManager, { Address } from '@/components/AddressManager';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import EnhancedCheckoutItem from '@/components/EnhancedCheckoutItem';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { validateData, CheckoutDataSchema } from '@/lib/validation';
+import { handleError, AuthenticationError, ValidationError } from '@/lib/errors';
 
-const Checkout = () => {
+const CheckoutV2 = () => {
   const { items, getTotalPrice } = useShoppingCart();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -27,94 +31,94 @@ const Checkout = () => {
   };
 
   const handlePayment = async () => {
-    // Check authentication
-    if (!user) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please log in to proceed with checkout.',
-        variant: 'destructive'
-      });
-      navigate('/auth');
-      return;
-    }
-
-    if (items.length === 0) {
-      toast({
-        title: 'Empty Cart',
-        description: 'Please add services to your cart before checkout.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (!selectedAddress) {
-      toast({
-        title: 'Address Required',
-        description: 'Please select a service address.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    const itemsWithoutDate = items.filter(item => !item.scheduled_date);
-    if (itemsWithoutDate.length > 0) {
-      toast({
-        title: 'Missing Schedule',
-        description: 'All services must have a scheduled date before checkout.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
     setLoading(true);
 
     try {
+      // Authentication check
+      if (!user) {
+        throw new AuthenticationError('Please log in to proceed with checkout.');
+      }
+
+      // Cart validation
+      if (items.length === 0) {
+        throw new ValidationError('Please add services to your cart before checkout.');
+      }
+
+      // Address validation
+      if (!selectedAddress) {
+        throw new ValidationError('Please select a service address.');
+      }
+
+      // Schedule validation
+      const itemsWithoutDate = items.filter(item => !item.scheduled_date);
+      if (itemsWithoutDate.length > 0) {
+        throw new ValidationError('All services must have a scheduled date before checkout.');
+      }
+
+      // Prepare checkout data
       const addressForCheckout = {
         address_line_1: selectedAddress.address_line_1,
         address_line_2: selectedAddress.address_line_2 || '',
         city: selectedAddress.city,
         state: selectedAddress.state,
-        zip_code: selectedAddress.postal_code,
+        postal_code: selectedAddress.postal_code,
         country: selectedAddress.country
       };
 
-      // Store complete cart data in sessionStorage before payment
-      const checkoutData = {
+      // Validate checkout data
+      const checkoutData = validateData(CheckoutDataSchema, {
         items: items,
-        address: addressForCheckout,
-        timestamp: Date.now()
-      };
-      
+        address: addressForCheckout
+      });
+
+      console.log('🛒 Validated checkout data:', checkoutData);
+
+      // Store complete cart data in sessionStorage before payment
       sessionStorage.setItem('pendingCheckoutItems', JSON.stringify(checkoutData.items));
       sessionStorage.setItem('pendingCheckoutAddress', JSON.stringify(checkoutData.address));
-      sessionStorage.setItem('checkoutTimestamp', checkoutData.timestamp.toString());
+      sessionStorage.setItem('checkoutTimestamp', Date.now().toString());
 
+      // Create Stripe checkout session
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          items: items,
-          address: addressForCheckout
+          items: checkoutData.items,
+          address: checkoutData.address
         }
       });
 
       if (error) {
-        console.error('Checkout error:', error);
-        throw error;
+        console.error('💳 Checkout error:', error);
+        throw new Error(error.message || 'Failed to create checkout session');
       }
 
       if (!data?.url) {
-        throw new Error('No checkout URL received');
+        throw new Error('No checkout URL received from payment processor');
       }
 
+      console.log('✅ Checkout session created, redirecting to payment...');
+      
       // Redirect to Stripe checkout
       window.location.href = data.url;
 
     } catch (error) {
-      console.error('Payment error:', error);
+      const appError = handleError(error);
+      console.error('❌ Payment error:', appError);
+      
       toast({
         title: 'Payment Failed',
-        description: 'There was an error processing your payment. Please try again.',
+        description: appError.message,
         variant: 'destructive'
       });
+
+      // Clear stored data on error
+      sessionStorage.removeItem('pendingCheckoutItems');
+      sessionStorage.removeItem('pendingCheckoutAddress');
+      sessionStorage.removeItem('checkoutTimestamp');
+
+      // Navigate to auth if authentication error
+      if (appError instanceof AuthenticationError) {
+        navigate('/auth');
+      }
     } finally {
       setLoading(false);
     }
@@ -156,7 +160,7 @@ const Checkout = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Enhanced Order Summary */}
+            {/* Order Summary */}
             <div className="space-y-6">
               <Card>
                 <CardHeader>
@@ -241,14 +245,7 @@ const Checkout = () => {
                 size="lg"
               >
                 {loading ? (
-                  <div className="flex items-center gap-2">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
-                    />
-                    Processing Payment...
-                  </div>
+                  <LoadingSpinner size="sm" text="Processing Payment..." />
                 ) : (
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5" />
@@ -276,4 +273,4 @@ const Checkout = () => {
   );
 };
 
-export default Checkout;
+export default CheckoutV2;

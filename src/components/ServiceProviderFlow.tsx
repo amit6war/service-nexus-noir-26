@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Star, MapPin, Clock, User, Calendar, Heart, ShoppingCart, Check } from 'lucide-react';
@@ -173,7 +172,6 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
           availability_schedule: { monday: '9:00-17:00', tuesday: '9:00-17:00' }
         }));
 
-        console.log('Loaded real providers:', transformedProviders);
         setProviders(transformedProviders);
         
       } catch (error) {
@@ -201,9 +199,21 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
     const isCurrentlyFavorite = isFavorite(provider.user_id);
     
     if (isCurrentlyFavorite) {
-      await removeFromFavorites(provider.user_id);
+      const success = await removeFromFavorites(provider.user_id);
+      if (success) {
+        toast({
+          title: 'Removed from Favorites',
+          description: `${provider.business_name} has been removed from your favorites.`,
+        });
+      }
     } else {
-      await addToFavorites(provider.user_id);
+      const success = await addToFavorites(provider.user_id);
+      if (success) {
+        toast({
+          title: 'Added to Favorites',
+          description: `${provider.business_name} has been added to your favorites.`,
+        });
+      }
     }
   };
 
@@ -356,7 +366,6 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
     );
   }
 
-  // Booking step with calendar functionality
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">

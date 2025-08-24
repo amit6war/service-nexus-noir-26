@@ -7,8 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,13 +31,19 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [loading, setLoading] = useState(false);
   const [conflictError, setConflictError] = useState('');
-  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [bookedSlots, setBookedSlots] = useState<Array<{provider_id: string, date: string, time: string}>>([]);
   
   const { addItem } = useShoppingCart();
   const { toast } = useToast();
 
-  console.log('BookingFlow rendered with:', { service: service?.title, provider: provider?.business_name });
+  // Generate available time slots
+  const timeSlots = [
+    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
+    '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+    '17:00', '17:30', '18:00'
+  ];
 
   // Load real availability data from database
   useEffect(() => {
@@ -79,17 +83,6 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     loadAvailability();
   }, [provider?.user_id]);
 
-  // Generate available time slots
-  const timeSlots = [
-    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
-    '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
-    '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
-    '17:00', '17:30', '18:00'
-  ];
-
-  // Get real booked slots from database
-  const [bookedSlots, setBookedSlots] = useState<Array<{provider_id: string, date: string, time: string}>>([]);
-
   const checkTimeSlotAvailability = (date: Date, time: string) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return !bookedSlots.some(slot => 
@@ -103,7 +96,6 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     setSelectedDate(date);
     setSelectedTimeSlot('');
     setConflictError('');
-    console.log('Date selected:', date);
   };
 
   const handleTimeSlotSelect = (time: string) => {
@@ -117,12 +109,9 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     
     setSelectedTimeSlot(time);
     setConflictError('');
-    console.log('Time slot selected:', time);
   };
 
   const handleConfirmBooking = async () => {
-    console.log('🛒 Confirm booking clicked - starting add to cart process');
-    
     if (!selectedDate || !selectedTimeSlot) {
       toast({
         title: 'Date & Time Required',
@@ -154,20 +143,13 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
         special_instructions: specialInstructions
       };
 
-      console.log('🛒 Adding item to cart:', cartItem);
-
       const success = await addItem(cartItem);
 
-      console.log('🛒 Add to cart result:', success);
-
       if (success) {
-        console.log('✅ Successfully added to cart - closing booking flow');
         onComplete();
-      } else {
-        console.log('❌ Failed to add to cart');
       }
     } catch (error) {
-      console.error('❌ Error adding to cart:', error);
+      console.error('Error adding to cart:', error);
       toast({
         title: 'Error',
         description: 'Failed to add booking to cart. Please try again.',
@@ -180,144 +162,6 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
 
   const isDateDisabled = (date: Date) => {
     return isBefore(startOfDay(date), startOfDay(new Date()));
-  };
-
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentMonth(prev => 
-      direction === 'prev' ? subMonths(prev, 1) : addMonths(prev, 1)
-    );
-  };
-
-  const handleYearChange = (year: string) => {
-    setCurrentMonth(setYear(currentMonth, parseInt(year)));
-  };
-
-  const handleMonthChange = (month: string) => {
-    setCurrentMonth(setMonth(currentMonth, parseInt(month)));
-  };
-
-  const getDaysInMonth = () => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    return eachDayOfInterval({ start, end });
-  };
-
-  // Generate year options (current year + next 2 years)
-  const currentYear = getYear(new Date());
-  const yearOptions = Array.from({ length: 3 }, (_, i) => currentYear + i);
-
-  // Month names
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  const renderCalendar = () => {
-    const days = getDaysInMonth();
-    const today = new Date();
-    
-    return (
-      <div className="bg-card rounded-lg border p-4">
-        {/* Enhanced Calendar Header with Month/Year Selectors */}
-        <div className="flex items-center justify-between mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigateMonth('prev')}
-            className="h-8 w-8 p-0"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          
-          <div className="flex items-center gap-2">
-            <Select value={getMonth(currentMonth).toString()} onValueChange={handleMonthChange}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Month" />
-              </SelectTrigger>
-              <SelectContent>
-                {monthNames.map((month, index) => (
-                  <SelectItem key={index} value={index.toString()}>
-                    {month}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Select value={getYear(currentMonth).toString()} onValueChange={handleYearChange}>
-              <SelectTrigger className="w-20">
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((year) => (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigateMonth('next')}
-            className="h-8 w-8 p-0"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Days of Week Header */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {/* Calendar Days Grid */}
-        <div className="grid grid-cols-7 gap-1">
-          {/* Add padding days for proper alignment */}
-          {Array.from({ length: startOfMonth(currentMonth).getDay() }).map((_, index) => (
-            <div key={`empty-${index}`} className="h-10"></div>
-          ))}
-          
-          {days.map((date) => {
-            const isToday = format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
-            const isSelected = selectedDate && format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
-            const isDisabled = isDateDisabled(date);
-            
-            return (
-              <Button
-                key={format(date, 'yyyy-MM-dd')}
-                variant={isSelected ? 'default' : 'ghost'}
-                size="sm"
-                className={cn(
-                  "h-10 w-full",
-                  isSelected && "bg-teal hover:bg-teal/90 text-white",
-                  isToday && !isSelected && "bg-accent text-accent-foreground",
-                  isDisabled && "opacity-50 cursor-not-allowed"
-                )}
-                onClick={() => !isDisabled && handleDateSelect(date)}
-                disabled={isDisabled}
-              >
-                {format(date, 'd')}
-              </Button>
-            );
-          })}
-        </div>
-
-        {/* Selected Date Display */}
-        {selectedDate && (
-          <div className="mt-4 p-3 bg-accent/50 rounded-lg">
-            <p className="text-sm font-medium">
-              Selected Date: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-            </p>
-          </div>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -389,16 +233,30 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
               </CardContent>
             </Card>
 
-            {/* Dynamic Calendar Selection */}
+            {/* Calendar Selection */}
             <Card>
               <CardHeader>
                 <CardTitle>
                   <Calendar className="w-4 h-4 inline mr-2" />
-                  Select Date *
+                  Select Date
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {renderCalendar()}
+                <CalendarComponent
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={handleDateSelect}
+                  disabled={isDateDisabled}
+                  className={cn("w-full pointer-events-auto")}
+                />
+                
+                {selectedDate && (
+                  <div className="mt-4 p-3 bg-accent/50 rounded-lg">
+                    <p className="text-sm font-medium">
+                      Selected Date: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

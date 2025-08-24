@@ -1,139 +1,122 @@
 
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { useState } from "react";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import CustomerDashboard from "./pages/CustomerDashboard";
-import ProviderDashboard from "./pages/ProviderDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import ProviderProfile from "./pages/ProviderProfile";
-import Checkout from "./pages/Checkout";
-import ProviderDetail from "./pages/ProviderDetail";
-import PaymentSuccess from "./components/PaymentSuccess";
-import NotFound from "./pages/NotFound";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/hooks/useAuth";
+import ErrorBoundary from "@/components/ErrorBoundary";
+const Home = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const CustomerDashboard = lazy(() => import("./pages/CustomerDashboard"));
+const ProviderDashboard = lazy(() => import("./pages/ProviderDashboard"));
+const Service = lazy(() => import("./pages/Service"));
+const Services = lazy(() => import("./pages/Services"));
+const Providers = lazy(() => import("./pages/Providers"));
+const Provider = lazy(() => import("./pages/Provider"));
+const CheckoutV2 = lazy(() => import("./pages/CheckoutV2"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 
-// Protected Route Component
-const ProtectedRoute = ({ children, requireAuth = true }: { children: React.ReactNode, requireAuth?: boolean }) => {
-  const { user, loading } = useAuth();
+const queryClient = new QueryClient();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-navy flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-teal border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (requireAuth && !user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  if (!requireAuth && user) {
-    return <Navigate to="/customer-dashboard" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-const AppRoutes = () => {
-  return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route 
-        path="/auth" 
-        element={
-          <ProtectedRoute requireAuth={false}>
-            <Auth />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/customer-dashboard" 
-        element={
-          <ProtectedRoute>
-            <CustomerDashboard />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/provider-dashboard" 
-        element={
-          <ProtectedRoute>
-            <ProviderDashboard />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/admin-dashboard" 
-        element={
-          <ProtectedRoute>
-            <AdminDashboard />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/provider-profile" 
-        element={
-          <ProtectedRoute>
-            <ProviderProfile />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/provider-profile/:providerId" 
-        element={<ProviderDetail />} 
-      />
-      <Route 
-        path="/checkout" 
-        element={
-          <ProtectedRoute>
-            <Checkout />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/payment-success" 
-        element={
-          <ProtectedRoute>
-            <PaymentSuccess />
-          </ProtectedRoute>
-        } 
-      />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-};
-
-const AppContent = () => {
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 1000 * 60 * 5, // 5 minutes
-        retry: 1,
-      },
-    },
-  }));
-
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <AppRoutes />
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <ErrorBoundary>
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Home />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/auth"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Auth />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/customer-dashboard"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <CustomerDashboard />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/provider-dashboard"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <ProviderDashboard />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/service/:serviceId"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Service />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/services"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Services />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/providers"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Providers />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/provider/:providerId"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Provider />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/checkout"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <CheckoutV2 />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/payment-success"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <PaymentSuccess />
+                    </Suspense>
+                  }
+                />
+              </Routes>
+            </ErrorBoundary>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
-};
-
-const App = () => <AppContent />;
+}
 
 export default App;
