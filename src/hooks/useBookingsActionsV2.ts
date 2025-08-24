@@ -1,3 +1,4 @@
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -61,7 +62,7 @@ export const useBookingsActionsV2 = () => {
       
       // Add status history entry
       try {
-        await supabase
+        const { error: historyError } = await supabase
           .from('booking_status_history')
           .insert({
             booking_id: data.id,
@@ -70,6 +71,10 @@ export const useBookingsActionsV2 = () => {
             changed_by: user?.id || '',
             notes: 'Booking accepted by provider'
           });
+
+        if (historyError) {
+          console.warn('⚠️ Failed to add status history:', historyError);
+        }
       } catch (error) {
         console.warn('⚠️ Failed to add status history:', error);
       }
@@ -125,7 +130,7 @@ export const useBookingsActionsV2 = () => {
       
       // Add status history entry
       try {
-        await supabase
+        const { error: historyError } = await supabase
           .from('booking_status_history')
           .insert({
             booking_id: data.id,
@@ -134,6 +139,10 @@ export const useBookingsActionsV2 = () => {
             changed_by: user?.id || '',
             notes: 'Service started by provider'
           });
+
+        if (historyError) {
+          console.warn('⚠️ Failed to add status history:', historyError);
+        }
       } catch (error) {
         console.warn('⚠️ Failed to add status history:', error);
       }
@@ -190,7 +199,7 @@ export const useBookingsActionsV2 = () => {
       
       // Add status history entry
       try {
-        await supabase
+        const { error: historyError } = await supabase
           .from('booking_status_history')
           .insert({
             booking_id: data.id,
@@ -199,6 +208,10 @@ export const useBookingsActionsV2 = () => {
             changed_by: user?.id || '',
             notes: 'Service completed by provider'
           });
+
+        if (historyError) {
+          console.warn('⚠️ Failed to add status history:', historyError);
+        }
       } catch (error) {
         console.warn('⚠️ Failed to add status history:', error);
       }
@@ -255,7 +268,7 @@ export const useBookingsActionsV2 = () => {
       
       // Add status history entry
       try {
-        await supabase
+        const { error: historyError } = await supabase
           .from('booking_status_history')
           .insert({
             booking_id: data.id,
@@ -264,6 +277,10 @@ export const useBookingsActionsV2 = () => {
             changed_by: user?.id || '',
             notes: 'Booking cancelled by customer',
           });
+
+        if (historyError) {
+          console.warn('⚠️ Failed to add status history:', historyError);
+        }
       } catch (error) {
         console.warn('⚠️ Failed to add status history:', error);
       }
@@ -291,7 +308,7 @@ export const useBookingsActionsV2 = () => {
     acceptBooking,
     markInProgress,
     completeBooking,
-    cancelBooking: cancelBooking, // Keep existing cancelBooking if it exists
+    cancelBooking,
     isLoading: acceptBooking.isPending || markInProgress.isPending || completeBooking.isPending
   };
 };

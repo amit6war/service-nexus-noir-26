@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -26,7 +25,7 @@ interface CartItem {
 const PaymentSuccessV2 = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { clearCart, setItems } = useShoppingCart();
+  const { clearCart } = useShoppingCart();
   const [checkoutData, setCheckoutData] = useState<{
     items: CartItem[];
     address: any;
@@ -73,7 +72,6 @@ const PaymentSuccessV2 = () => {
 
             // Clear the cart and stored data
             clearCart();
-            setItems([]);
             
             // Clean up localStorage
             localStorage.removeItem('pendingCheckoutItems');
@@ -100,7 +98,7 @@ const PaymentSuccessV2 = () => {
       console.warn('Invalid payment success parameters');
       navigate('/customer-dashboard');
     }
-  }, [searchParams, navigate, clearCart, setItems]);
+  }, [searchParams, navigate, clearCart]);
 
   if (!checkoutData) {
     return (
