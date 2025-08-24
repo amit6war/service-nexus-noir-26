@@ -1,318 +1,342 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { motion } from 'framer-motion';
+import { User, Calendar, Heart, ShoppingCart, Star, Clock, MapPin, Bell, LogOut, DollarSign } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Calendar, 
-  Heart, 
-  ShoppingCart, 
-  User, 
-  Clock, 
-  DollarSign,
-  Star,
-  MapPin,
-  Phone,
-  Settings,
-  Bell,
-  CreditCard,
-  Shield,
-  HelpCircle,
-  LogOut
-} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
+import { useServices } from '@/hooks/useServices';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
-import { useToast } from '@/hooks/use-toast';
-import MyBookings from '@/components/MyBookings';
-import FavoritesSection from '@/components/FavoritesSection';
+import ServiceProviderFlow from '@/components/ServiceProviderFlow';
+import CartSection from '@/components/CartSection';
 import ProfileSettings from '@/components/ProfileSettings';
-import { supabase } from '@/integrations/supabase/client';
+import MyBookings from '@/components/MyBookings';
+import AmountSection from '@/components/AmountSection';
 
 const CustomerDashboard = () => {
-  const { user, signOut } = useAuth();
-  const { items } = useShoppingCart();
-  const { toast } = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState('services');
+  const [selectedService, setSelectedService] = useState(null);
+  const [selectedProvider, setSelectedProvider] = useState(null);
+  const [showCart, setShowCart] = useState(false);
   
-  // Get the active tab from URL parameters or default to 'overview'
-  const activeTab = searchParams.get('tab') || 'overview';
+  const { user, signOut } = useAuth();
+  const { services, loading, error, silentRefresh } = useServices();
+  const { itemCount, initialized } = useShoppingCart();
 
-  // Set active tab and update URL
-  const setActiveTab = (tab: string) => {
-    setSearchParams({ tab });
+  console.log('🏠 CustomerDashboard render - cart itemCount:', itemCount, 'initialized:', initialized);
+
+  // Handle URL parameters and state for tab switching
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam && ['services', 'bookings', 'amount', 'favorites', 'profile'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+    
+    // Handle navigation state
+    const state = (window.history.state?.usr);
+    if (state?.activeTab) {
+      setActiveTab(state.activeTab);
+    } else if (state?.tab) {
+      setActiveTab(state.tab);
+    }
+  }, []);
+
+  // Force re-render when cart changes by watching itemCount
+  useEffect(() => {
+    console.log('🏠 CustomerDashboard - cart count changed to:', itemCount);
+  }, [itemCount]);
+
+  const handleServiceSelect = (service) => {
+    setSelectedService(service);
   };
 
-  const [stats, setStats] = useState({
-    totalBookings: 0,
-    upcomingBookings: 0,
-    completedBookings: 0,
-    favoriteProviders: 0,
-    cartItems: 0
-  });
+  const handleProviderSelect = (provider) => {
+    setSelectedProvider(provider);
+  };
 
-  const [loading, setLoading] = useState(true);
-
-  // Load dashboard statistics
-  useEffect(() => {
-    const loadDashboardStats = async () => {
-      if (!user?.id) return;
-
-      try {
-        setLoading(true);
-
-        // Get booking statistics
-        const { data: bookings, error: bookingsError } = await supabase
-          .from('bookings')
-          .select('status, service_date')
-          .eq('customer_id', user.id);
-
-        if (bookingsError) {
-          console.error('Error loading booking stats:', bookingsError);
-        }
-
-        // Get favorites count
-        const { data: favorites, error: favoritesError } = await supabase
-          .from('favorites')
-          .select('id')
-          .eq('customer_id', user.id);
-
-        if (favoritesError) {
-          console.error('Error loading favorites stats:', favoritesError);
-        }
-
-        // Calculate statistics
-        const now = new Date();
-        const totalBookings = bookings?.length || 0;
-        const upcomingBookings = bookings?.filter(b => 
-          new Date(b.service_date) > now && 
-          (b.status === 'pending' || b.status === 'confirmed')
-        ).length || 0;
-        const completedBookings = bookings?.filter(b => 
-          b.status === 'completed' || b.status === 'confirmed'
-        ).length || 0;
-        const favoriteProviders = favorites?.length || 0;
-
-        setStats({
-          totalBookings,
-          upcomingBookings,
-          completedBookings,
-          favoriteProviders,
-          cartItems: items.length
-        });
-
-      } catch (error) {
-        console.error('Error loading dashboard stats:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load dashboard statistics.',
-          variant: 'destructive'
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDashboardStats();
-  }, [user?.id, items.length, toast]);
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast({
-        title: 'Signed Out',
-        description: 'You have been successfully signed out.'
-      });
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to sign out. Please try again.',
-        variant: 'destructive'
-      });
+  const handleBookingComplete = () => {
+    setSelectedService(null);
+    setSelectedProvider(null);
+    setActiveTab('services');
+    // Refresh services data after booking completion
+    if (silentRefresh) {
+      silentRefresh();
     }
   };
 
-  const renderOverviewCards = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Bookings</p>
-              <p className="text-2xl font-bold">{stats.totalBookings}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+  const handleSignOut = async () => {
+    await signOut();
+  };
 
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Upcoming</p>
-              <p className="text-2xl font-bold">{stats.upcomingBookings}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
-              <Heart className="w-6 h-6 text-teal-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Favorites</p>
-              <p className="text-2xl font-bold">{stats.favoriteProviders}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <ShoppingCart className="w-6 h-6 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Cart Items</p>
-              <p className="text-2xl font-bold">{stats.cartItems}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal"></div>
-          <span className="ml-2 text-muted-foreground">Loading dashboard...</span>
-        </div>
-      </div>
-    );
-  }
+  // Group services by category
+  const servicesByCategory = services.reduce((acc, service) => {
+    const category = service.category || 'Other';
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(service);
+    return acc;
+  }, {});
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">
-            Welcome back, {user?.user_metadata?.first_name || 'Customer'}!
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your bookings, favorites, and account settings
-          </p>
+    <div className="min-h-screen bg-background flex">
+      {/* Fixed Sidebar */}
+      <div className="w-64 bg-card border-r border-border flex flex-col fixed left-0 top-0 h-full z-10">
+        {/* User Profile Section */}
+        <div className="p-6 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-teal/20 rounded-full flex items-center justify-center">
+              <User className="w-6 h-6 text-teal" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-foreground">Welcome back!</h2>
+              <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
+            </div>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-4">
-          {stats.cartItems > 0 && (
-            <Button variant="outline" className="relative">
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              Cart
-              <Badge className="absolute -top-2 -right-2 bg-teal text-white">
-                {stats.cartItems}
-              </Badge>
-            </Button>
-          )}
+
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-2">
+          <button
+            onClick={() => setActiveTab('services')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              activeTab === 'services' 
+                ? 'bg-teal/10 text-teal border border-teal/20' 
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <Star className="w-5 h-5" />
+            Services
+          </button>
           
-          <Button variant="outline" onClick={handleSignOut}>
-            <LogOut className="w-4 h-4 mr-2" />
+          <button
+            onClick={() => setActiveTab('bookings')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              activeTab === 'bookings' 
+                ? 'bg-teal/10 text-teal border border-teal/20' 
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <Calendar className="w-5 h-5" />
+            My Bookings
+          </button>
+
+          <button
+            onClick={() => setActiveTab('amount')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              activeTab === 'amount' 
+                ? 'bg-teal/10 text-teal border border-teal/20' 
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <DollarSign className="w-5 h-5" />
+            Amount
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('favorites')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              activeTab === 'favorites' 
+                ? 'bg-teal/10 text-teal border border-teal/20' 
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <Heart className="w-5 h-5" />
+            Favorites
+          </button>
+
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              activeTab === 'profile' 
+                ? 'bg-teal/10 text-teal border border-teal/20' 
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <User className="w-5 h-5" />
+            Profile Settings
+          </button>
+        </nav>
+
+        {/* Cart and Sign Out */}
+        <div className="p-4 border-t border-border space-y-2">
+          <button
+            onClick={() => setShowCart(true)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors text-muted-foreground hover:bg-muted hover:text-foreground relative"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            Cart
+            {initialized && itemCount > 0 && (
+              <Badge 
+                key={itemCount} // Force re-render when count changes
+                className="ml-auto bg-teal text-white min-w-[24px] h-6 flex items-center justify-center rounded-full"
+              >
+                {itemCount}
+              </Badge>
+            )}
+          </button>
+          
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors text-muted-foreground hover:bg-red-50 hover:text-red-600 hover:border-red-200 border border-transparent"
+          >
+            <LogOut className="w-5 h-5" />
             Sign Out
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* Dashboard Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-fit lg:grid-cols-4 gap-2">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <User className="w-4 h-4" />
-            <span className="hidden sm:inline">Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="bookings" className="flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            <span className="hidden sm:inline">Bookings</span>
-          </TabsTrigger>
-          <TabsTrigger value="favorites" className="flex items-center gap-2">
-            <Heart className="w-4 h-4" />
-            <span className="hidden sm:inline">Favorites</span>
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            <span className="hidden sm:inline">Settings</span>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <div className="space-y-6">
-            <h2 className="text-2xl font-semibold">Dashboard Overview</h2>
-            {renderOverviewCards()}
-            
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button 
-                    variant="outline" 
-                    className="h-20 flex-col gap-2"
-                    onClick={() => setActiveTab('bookings')}
-                  >
-                    <Calendar className="w-6 h-6" />
-                    <span>View Bookings</span>
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    className="h-20 flex-col gap-2"
-                    onClick={() => setActiveTab('favorites')}
-                  >
-                    <Heart className="w-6 h-6" />
-                    <span>Browse Favorites</span>
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    className="h-20 flex-col gap-2"
-                    onClick={() => window.location.href = '/'}
-                  >
-                    <Star className="w-6 h-6" />
-                    <span>Find Services</span>
-                  </Button>
+      {/* Main Content Area - with left margin to account for fixed sidebar */}
+      <div className="flex-1 ml-64">
+        <div className="h-screen overflow-y-auto">
+          <div className="p-6">
+            {/* Services Tab */}
+            {activeTab === 'services' && !selectedService && (
+              <div className="space-y-6">
+                <div>
+                  <h1 className="text-3xl font-bold text-foreground mb-2">Services</h1>
+                  <p className="text-muted-foreground">Find the perfect service for your needs</p>
                 </div>
-              </CardContent>
-            </Card>
+
+                {loading && (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading services...</p>
+                    </div>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="text-center py-12">
+                    <p className="text-red-500 mb-4">Error loading services: {error}</p>
+                    <Button onClick={() => window.location.reload()} variant="outline">
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
+                {!loading && !error && Object.keys(servicesByCategory).length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">No services available at the moment.</p>
+                  </div>
+                )}
+
+                {!loading && !error && Object.keys(servicesByCategory).map((category) => (
+                  <div key={category} className="space-y-4">
+                    <h2 className="text-xl font-semibold text-foreground">{category}</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {servicesByCategory[category].map((service) => (
+                        <motion.div
+                          key={service.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="group"
+                        >
+                          <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                            <CardHeader>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <CardTitle className="flex items-center gap-2">
+                                    {service.title}
+                                    {service.is_featured && (
+                                      <Badge className="bg-yellow-500 text-white">Featured</Badge>
+                                    )}
+                                    {service.emergency_available && (
+                                      <Badge variant="outline" className="text-red-500 border-red-500">Emergency</Badge>
+                                    )}
+                                  </CardTitle>
+                                  <CardDescription className="mt-2">
+                                    {service.description}
+                                  </CardDescription>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between text-sm">
+                                   <div className="flex items-center gap-4">
+                                     <div className="flex items-center gap-1">
+                                       <Clock className="w-4 h-4 text-muted-foreground" />
+                                       <span>{service.duration_minutes} min</span>
+                                     </div>
+                                     <div className="flex items-center gap-1">
+                                       <User className="w-4 h-4 text-muted-foreground" />
+                                       <span>6+ providers</span>
+                                     </div>
+                                   </div>
+                                 </div>
+                                 
+                                 <div className="flex items-center justify-between">
+                                   <div className="text-right">
+                                     <span className="text-lg font-bold text-teal">
+                                       Starting from ${Math.round(service.base_price * 0.6)}
+                                     </span>
+                                     <span className="text-muted-foreground">
+                                       {service.price_type === 'hourly' ? '/hr' : ''}
+                                     </span>
+                                   </div>
+                                </div>
+                                
+                                <Button 
+                                  onClick={() => handleServiceSelect(service)}
+                                  className="w-full bg-teal hover:bg-teal/90"
+                                >
+                                  View Providers
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Service Provider Selection */}
+            {activeTab === 'services' && selectedService && (
+              <ServiceProviderFlow
+                selectedService={selectedService}
+                onBack={() => {
+                  setSelectedService(null);
+                }}
+                onBookService={handleBookingComplete}
+                onCartUpdate={silentRefresh}
+              />
+            )}
+
+            {/* My Bookings */}
+            {activeTab === 'bookings' && (
+              <MyBookings />
+            )}
+
+            {/* Amount Section */}
+            {activeTab === 'amount' && (
+              <AmountSection />
+            )}
+
+            {activeTab === 'favorites' && (
+              <div className="space-y-6">
+                <h1 className="text-3xl font-bold text-foreground">Favorites</h1>
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No favorites yet. Browse services and save your preferred providers!</p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'profile' && (
+              <ProfileSettings />
+            )}
           </div>
-        </TabsContent>
+        </div>
+      </div>
 
-        <TabsContent value="bookings">
-          <MyBookings />
-        </TabsContent>
-
-        <TabsContent value="favorites">
-          <FavoritesSection />
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <ProfileSettings />
-        </TabsContent>
-      </Tabs>
+      {/* Cart Section */}
+      <CartSection isOpen={showCart} onClose={() => setShowCart(false)} />
     </div>
   );
 };

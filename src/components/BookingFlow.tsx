@@ -100,16 +100,14 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
   };
 
   const handleDateSelect = (date: Date | undefined) => {
-    console.log('📅 Date selected:', date);
     setSelectedDate(date);
     setSelectedTimeSlot('');
     setConflictError('');
+    console.log('Date selected:', date);
   };
 
   const handleTimeSlotSelect = (time: string) => {
     if (!selectedDate) return;
-    
-    console.log('⏰ Time slot selected:', time);
     
     // Check if this provider is available at this time
     if (!checkTimeSlotAvailability(selectedDate, time)) {
@@ -119,6 +117,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     
     setSelectedTimeSlot(time);
     setConflictError('');
+    console.log('Time slot selected:', time);
   };
 
   const handleConfirmBooking = async () => {
@@ -217,18 +216,15 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     const days = getDaysInMonth();
     const today = new Date();
     
-    console.log('🗓️ Rendering calendar for month:', format(currentMonth, 'MMMM yyyy'));
-    console.log('📅 Days in month:', days.length);
-    
     return (
-      <div className="bg-card rounded-lg border p-4 w-full">
+      <div className="bg-card rounded-lg border p-4">
         {/* Enhanced Calendar Header with Month/Year Selectors */}
         <div className="flex items-center justify-between mb-6">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigateMonth('prev')}
-            className="h-8 w-8 p-0 hover:bg-accent"
+            className="h-8 w-8 p-0"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -265,7 +261,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => navigateMonth('next')}
-            className="h-8 w-8 p-0 hover:bg-accent"
+            className="h-8 w-8 p-0"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -298,11 +294,10 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
                 variant={isSelected ? 'default' : 'ghost'}
                 size="sm"
                 className={cn(
-                  "h-10 w-full text-sm font-medium rounded-md transition-colors",
+                  "h-10 w-full",
                   isSelected && "bg-teal hover:bg-teal/90 text-white",
-                  isToday && !isSelected && "bg-accent text-accent-foreground border border-teal/30",
-                  isDisabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
-                  !isSelected && !isToday && !isDisabled && "hover:bg-accent hover:text-accent-foreground"
+                  isToday && !isSelected && "bg-accent text-accent-foreground",
+                  isDisabled && "opacity-50 cursor-not-allowed"
                 )}
                 onClick={() => !isDisabled && handleDateSelect(date)}
                 disabled={isDisabled}
@@ -315,8 +310,8 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
 
         {/* Selected Date Display */}
         {selectedDate && (
-          <div className="mt-4 p-3 bg-teal/10 border border-teal/20 rounded-lg">
-            <p className="text-sm font-medium text-teal-800">
+          <div className="mt-4 p-3 bg-accent/50 rounded-lg">
+            <p className="text-sm font-medium">
               Selected Date: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
             </p>
           </div>
@@ -394,7 +389,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
               </CardContent>
             </Card>
 
-            {/* Enhanced Calendar Selection */}
+            {/* Dynamic Calendar Selection */}
             <Card>
               <CardHeader>
                 <CardTitle>
@@ -402,10 +397,8 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
                   Select Date *
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="p-6">
-                  {renderCalendar()}
-                </div>
+              <CardContent>
+                {renderCalendar()}
               </CardContent>
             </Card>
 
