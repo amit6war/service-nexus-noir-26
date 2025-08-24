@@ -27,10 +27,11 @@ interface Booking {
   service_id?: string;
   services?: {
     title: string;
-  }[];
+    provider_id: string;
+  };
   provider_profiles?: {
     business_name: string;
-  }[];
+  };
 }
 
 const MyBookings = () => {
@@ -169,9 +170,9 @@ const MyBookings = () => {
   );
 
   const renderBookingCard = (booking: Booking, isPast: boolean = false) => {
-    // Fixed: Access first element of array since Supabase joins return arrays
-    const serviceName = booking.services?.[0]?.title || 'Service';
-    const providerName = booking.provider_profiles?.[0]?.business_name || 'Provider';
+    // Fixed: Access service and provider data as single objects, not arrays
+    const serviceName = booking.services?.title || 'Service';
+    const providerName = booking.provider_profiles?.business_name || 'Provider';
 
     return (
       <Card key={booking.id} className="hover:shadow-lg transition-shadow">
@@ -368,8 +369,8 @@ const MyBookings = () => {
         <RatingReviewForm
           bookingId={showRatingForm}
           providerUserId={bookings.find(b => b.id === showRatingForm)?.provider_user_id || ''}
-          serviceName={bookings.find(b => b.id === showRatingForm)?.services?.[0]?.title || 'Service'}
-          providerName={bookings.find(b => b.id === showRatingForm)?.provider_profiles?.[0]?.business_name || 'Provider'}
+          serviceName={bookings.find(b => b.id === showRatingForm)?.services?.title || 'Service'}
+          providerName={bookings.find(b => b.id === showRatingForm)?.provider_profiles?.business_name || 'Provider'}
           onSubmitSuccess={handleRatingSubmitSuccess}
           onCancel={() => setShowRatingForm(null)}
         />
