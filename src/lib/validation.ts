@@ -21,7 +21,12 @@ export const CartItemSchema = z.object({
   provider_name: z.string().min(1, 'Provider name is required'),
   price: z.number().positive('Price must be positive'),
   duration_minutes: z.number().positive('Duration must be positive'),
-  scheduled_date: z.string().datetime('Invalid scheduled date'),
+  // Fix: Make scheduled_date validation more flexible to handle different date formats
+  scheduled_date: z.string().min(1, 'Scheduled date is required').refine((date) => {
+    // Accept any non-empty string and let the system handle date parsing
+    const parsed = new Date(date);
+    return !isNaN(parsed.getTime());
+  }, 'Invalid scheduled date format'),
   special_instructions: z.string().optional()
 });
 
