@@ -999,6 +999,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      validate_provider_exists: {
+        Args: { provider_user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:

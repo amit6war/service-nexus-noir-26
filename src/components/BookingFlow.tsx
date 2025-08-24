@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Calendar, Clock, User, Star, DollarSign, CalendarIcon, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { format, addDays, isBefore, startOfDay, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getYear, getMonth, setYear, setMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -446,7 +447,6 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
                            })}
                          </div>
                        )}
-                      </div>
                       
                       {conflictError && (
                         <div className="flex items-center gap-2 mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">

@@ -124,18 +124,21 @@ const MyBookings = () => {
   useEffect(() => {
     loadBookings();
 
-    // Set up real-time updates
+    // Set up real-time subscription for booking updates
+    if (!user) return;
+
     const channel = supabase
-      .channel('booking-changes')
+      .channel('bookings-changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'bookings',
-          filter: `customer_id=eq.${user?.id}`
+          filter: `customer_id=eq.${user.id}`
         },
-        () => {
+        (payload) => {
+          console.log('Booking change detected:', payload);
           loadBookings();
         }
       )
