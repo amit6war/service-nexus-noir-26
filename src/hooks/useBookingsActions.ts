@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -99,7 +98,9 @@ export const useBookingsActions = () => {
           service_city: address.city,
           service_state: address.state,
           service_zip: address.postal_code,
-          booking_number: generateBookingNumber(), // FIX: ensure <= VARCHAR(20)
+          booking_number: generateBookingNumber(),
+          status: 'confirmed', // Set as confirmed after payment
+          confirmed_at: new Date().toISOString()
         };
 
         console.log('📝 Creating booking with data:', bookingData);
@@ -112,7 +113,6 @@ export const useBookingsActions = () => {
 
         if (error) {
           console.error('❌ Error creating booking:', error);
-          // Let outer catch wrap with readable message
           throw error;
         }
 
@@ -128,7 +128,6 @@ export const useBookingsActions = () => {
     } catch (error) {
       const msg = formatError(error);
       console.error('❌ Error in createBookingsFromCart:', error, '->', msg);
-      // Throw a clean Error so PaymentSuccess shows the exact details
       throw new Error(msg);
     } finally {
       setLoading(false);
