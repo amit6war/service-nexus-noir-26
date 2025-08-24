@@ -121,16 +121,21 @@ const CartSection: React.FC<CartSectionProps> = ({ isOpen, onClose }) => {
                                 </div>
                               </div>
                               
-                              {item.scheduled_date && (
-                                <div className="p-3 bg-muted/30 rounded-lg">
-                                  <div className="text-sm">
-                                    <span className="font-medium text-foreground">Scheduled:</span>
-                                    <p className="text-muted-foreground mt-1">
-                                      {format(new Date(item.scheduled_date), 'PPP p')}
-                                    </p>
+                              {item.scheduled_date && (() => {
+                                const date = new Date(item.scheduled_date);
+                                const isValidDate = !isNaN(date.getTime());
+                                
+                                return isValidDate ? (
+                                  <div className="p-3 bg-muted/30 rounded-lg">
+                                    <div className="text-sm">
+                                      <span className="font-medium text-foreground">Scheduled:</span>
+                                      <p className="text-muted-foreground mt-1">
+                                        {format(date, 'PPP p')}
+                                      </p>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                ) : null;
+                              })()}
                               
                               {item.special_instructions && (
                                 <div className="p-3 bg-muted/30 rounded-lg">

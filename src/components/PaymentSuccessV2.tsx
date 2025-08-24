@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle, Package, User, Clock, MapPin, ArrowRight } from 'lucide-react';
+import { CheckCircle, Package, User, Clock, MapPin, ArrowRight, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,23 +31,62 @@ const PaymentSuccessV2 = () => {
     address: any;
     totalAmount: number;
   } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
     const success = searchParams.get('success');
 
+    // Enhanced debugging
+    const currentUrl = window.location.href;
+    const allParams = Object.fromEntries(searchParams.entries());
+    const sessionStorageKeys = Object.keys(sessionStorage);
+    const pendingItems = sessionStorage.getItem('pendingCheckoutItems');
+    const pendingAddress = sessionStorage.getItem('pendingCheckoutAddress');
+    
+    const debugData = {
+      currentUrl,
+      urlParams: allParams,
+      sessionStorageKeys,
+      hasPendingItems: !!pendingItems,
+      hasPendingAddress: !!pendingAddress,
+      pendingItemsLength: pendingItems ? JSON.parse(pendingItems).length : 0
+    };
+    
+    console.log('PaymentSuccessV2 Debug Info:', debugData);
+    setDebugInfo(JSON.stringify(debugData, null, 2));
+
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.warn('Payment success page timeout - redirecting to dashboard');
+        setError(`Payment processing timeout. Debug info: ${JSON.stringify(debugData)}`);
+        setLoading(false);
+        setTimeout(() => navigate('/customer-dashboard'), 3000);
+      }
+    }, 5000); // Reduced to 5 seconds for faster debugging
+
     if (success === 'true' && sessionId) {
-      // Retrieve stored checkout data
-      const pendingItems = localStorage.getItem('pendingCheckoutItems');
-      const pendingAddress = localStorage.getItem('pendingCheckoutAddress');
-      const pendingAmount = localStorage.getItem('pendingCheckoutAmount');
+      // Retrieve stored checkout data from sessionStorage
+      const pendingItems = sessionStorage.getItem('pendingCheckoutItems');
+      const pendingAddress = sessionStorage.getItem('pendingCheckoutAddress');
 
-      console.log('Payment success - retrieving stored data:', { pendingItems, pendingAddress, pendingAmount });
+      console.log('Payment success - retrieving stored data:', { 
+        pendingItems: pendingItems ? 'found' : 'missing', 
+        pendingAddress: pendingAddress ? 'found' : 'missing' 
+      });
 
-      if (pendingItems && pendingAddress && pendingAmount) {
+      if (pendingItems && pendingAddress) {
         try {
           const rawItems = JSON.parse(pendingItems);
           const rawAddress = JSON.parse(pendingAddress);
+          
+          console.log('Parsed data:', { itemsCount: rawItems.length, address: rawAddress });
+          
+          // Calculate total amount from items
+          const calculatedAmount = rawItems.reduce((sum: number, item: any) => sum + (Number(item.price) || 0), 0);
           
           // Ensure all required fields are present and properly typed
           const itemsWithIds: CartItem[] = rawItems.map((item: any, index: number): CartItem => ({
@@ -67,16 +106,19 @@ const PaymentSuccessV2 = () => {
             setCheckoutData({
               items: itemsWithIds,
               address: rawAddress,
-              totalAmount: parseFloat(pendingAmount)
+              totalAmount: calculatedAmount
             });
 
             // Clear the cart and stored data
             clearCart();
             
-            // Clean up localStorage
-            localStorage.removeItem('pendingCheckoutItems');
-            localStorage.removeItem('pendingCheckoutAddress');
-            localStorage.removeItem('pendingCheckoutAmount');
+            // Clean up sessionStorage
+            sessionStorage.removeItem('pendingCheckoutItems');
+            sessionStorage.removeItem('pendingCheckoutAddress');
+            sessionStorage.removeItem('checkoutTimestamp');
+
+            setLoading(false);
+            clearTimeout(timeoutId);
 
             toast({
               title: "Payment Successful!",
@@ -84,31 +126,73 @@ const PaymentSuccessV2 = () => {
             });
           } else {
             console.warn('No valid items found in stored checkout data');
-            navigate('/customer-dashboard');
+            setError('No valid booking items found');
+            setLoading(false);
+            clearTimeout(timeoutId);
+            setTimeout(() => navigate('/customer-dashboard'), 2000);
           }
         } catch (error) {
           console.error('Error parsing stored checkout data:', error);
-          navigate('/customer-dashboard');
+          setError('Error processing payment data');
+          setLoading(false);
+          clearTimeout(timeoutId);
+          setTimeout(() => navigate('/customer-dashboard'), 2000);
         }
       } else {
         console.warn('Missing stored checkout data for payment success');
-        navigate('/customer-dashboard');
+        console.log('Available sessionStorage keys:', Object.keys(sessionStorage));
+        setError('Payment data not found');
+        setLoading(false);
+        clearTimeout(timeoutId);
+        setTimeout(() => navigate('/customer-dashboard'), 2000);
       }
     } else {
-      console.warn('Invalid payment success parameters');
-      navigate('/customer-dashboard');
+      console.warn('Invalid payment success parameters', { success, sessionId });
+      setError('Invalid payment parameters');
+      setLoading(false);
+      clearTimeout(timeoutId);
+      setTimeout(() => navigate('/customer-dashboard'), 2000);
     }
-  }, [searchParams, navigate, clearCart]);
 
-  if (!checkoutData) {
+    return () => clearTimeout(timeoutId);
+  }, [searchParams, navigate, clearCart, loading]);
+
+  // Show loading state
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-2xl">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Processing your payment...</p>
+          <p className="text-muted-foreground mb-4">Processing your payment...</p>
+          {/* Debug information */}
+          <details className="text-left text-xs text-muted-foreground bg-gray-100 p-4 rounded mt-4">
+            <summary className="cursor-pointer font-medium">Debug Info (Click to expand)</summary>
+            <pre className="mt-2 whitespace-pre-wrap">{debugInfo}</pre>
+          </details>
         </div>
       </div>
     );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-10 h-10 text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Payment Processing Error</h1>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <p className="text-sm text-muted-foreground">Redirecting to dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show success state
+  if (!checkoutData) {
+    return null; // This should never happen now
   }
 
   const { items, address, totalAmount } = checkoutData;

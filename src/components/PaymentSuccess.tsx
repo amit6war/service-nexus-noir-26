@@ -28,7 +28,10 @@ const PaymentSuccess = () => {
   const processPaymentSuccess = async (isRetry = false) => {
     // Guard if already processed in this session and not a retry
     if (!isRetry && (hasTriggeredRef.current || sessionStorage.getItem(PAYMENT_PROCESSED_FLAG) === 'true')) {
-      console.log('ℹ️ Payment success already processed. Skipping duplicate run.');
+      console.log('ℹ️ Payment success already processed. Showing success state.');
+      // Show success state for already processed payments
+      setBookingsCreated(true);
+      setShowModal(true);
       return;
     }
 
@@ -83,7 +86,7 @@ const PaymentSuccess = () => {
 
         toast({
           title: 'Payment & Booking Successful!',
-          description: `${items.length} booking${items.length !== 1 ? 's' : ''} created successfully. You will receive confirmation emails shortly.`,
+          description: `${items.length} booking${items.length !== 1 ? 's' : ''} created successfully.`,
         });
 
         console.log('🎉 Payment success process completed');
