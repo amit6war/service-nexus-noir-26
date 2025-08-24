@@ -1,11 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Calendar, User, AlertCircle, RefreshCw } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useBookingsActions } from '@/hooks/useBookingsActions';
 import { useToast } from '@/hooks/use-toast';
+import BookingResultModal from './BookingResultModal';
 
 const PaymentSuccess = () => {
   const navigate = useNavigate();
@@ -17,7 +16,7 @@ const PaymentSuccess = () => {
   const [paymentProcessed, setPaymentProcessed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryAttempts, setRetryAttempts] = useState(0);
-  const [createdBookings, setCreatedBookings] = useState<any[]>([]);
+  const [showModal, setShowModal] = useState(false);
 
   const processPaymentSuccess = async (isRetry = false) => {
     // Get stored checkout data
@@ -26,6 +25,7 @@ const PaymentSuccess = () => {
     
     if (!pendingItems || !pendingAddress) {
       setError('No payment data found. Please contact support if you were charged.');
+      setShowModal(true);
       return;
     }
 
@@ -55,7 +55,7 @@ const PaymentSuccess = () => {
         sessionStorage.removeItem('checkoutTimestamp');
         
         setBookingsCreated(true);
-        setCreatedBookings(items);
+        setShowModal(true);
         
         toast({
           title: 'Payment & Booking Successful!',
@@ -70,6 +70,7 @@ const PaymentSuccess = () => {
     } catch (error) {
       console.error('Error creating bookings after payment:', error);
       setError(`Booking creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setShowModal(true);
       
       // Show error with refund information
       toast({
@@ -109,142 +110,47 @@ const PaymentSuccess = () => {
     processPaymentSuccess();
   }, []);
 
-  // If there's an error and payment was processed, show error state with refund info
-  if (error && paymentProcessed) {
+  // Show loading state if still processing
+  if (creating && !showModal) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="container mx-auto px-4">
-          <Card className="max-w-md mx-auto border-destructive">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
-                <AlertCircle className="w-8 h-8 text-destructive" />
-              </div>
-              <CardTitle className="text-2xl font-bold text-destructive">
-                Booking Creation Failed
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-center space-y-4">
-              <p className="text-muted-foreground">
-                Your payment was processed successfully, but we encountered an issue creating your bookings.
-              </p>
-              
-              <div className="bg-muted/50 p-4 rounded-lg text-sm space-y-2">
-                <p className="font-semibold">What happens next:</p>
-                <ul className="text-left space-y-1">
-                  <li>• Our team has been automatically notified</li>
-                  <li>• We will attempt to create your bookings manually</li>
-                  <li>• If unsuccessful, a full refund will be processed within 3-5 business days</li>
-                  <li>• You will receive email updates on the status</li>
-                </ul>
-              </div>
-
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium">Error Details:</p>
-                <p className="bg-muted p-2 rounded text-xs font-mono">{error}</p>
-              </div>
-              
-              <div className="flex gap-4 justify-center pt-4">
-                {retryAttempts < 3 && (
-                  <Button 
-                    onClick={handleRetry} 
-                    variant="outline"
-                    disabled={creating}
-                    className="flex items-center gap-2"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${creating ? 'animate-spin' : ''}`} />
-                    Retry ({retryAttempts + 1}/3)
-                  </Button>
-                )}
-                <Button 
-                  onClick={handleViewDashboard} 
-                  className="bg-teal hover:bg-teal/90"
-                >
-                  Go to Dashboard
-                </Button>
-              </div>
-
-              <p className="text-xs text-muted-foreground mt-4">
-                Need immediate help? Contact our support team with your payment confirmation.
-              </p>
-            </CardContent>
-          </Card>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal mx-auto mb-4"></div>
+          <p className="text-muted-foreground">
+            Processing your payment and creating bookings...
+          </p>
         </div>
       </div>
     );
   }
 
-  // Success state
+  // Show modal for success or error
+  if (showModal) {
+    return (
+      <BookingResultModal
+        type={bookingsCreated ? 'success' : 'error'}
+        title={bookingsCreated ? 'Payment Successful!' : 'Booking Creation Failed'}
+        message={
+          bookingsCreated 
+            ? 'Thank you for your payment. Your bookings have been confirmed and you will receive confirmation emails shortly.'
+            : 'Your payment was processed successfully, but we encountered an issue creating your bookings.'
+        }
+        errorDetails={error || undefined}
+        onViewBookings={handleViewBookings}
+        onRetry={!bookingsCreated ? handleRetry : undefined}
+        onGoToDashboard={handleViewDashboard}
+        retryAttempts={retryAttempts}
+        isRetrying={creating}
+      />
+    );
+  }
+
+  // Fallback loading state
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="container mx-auto px-4">
-        <Card className="max-w-md mx-auto">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <CardTitle className="text-2xl font-bold text-green-600">
-              {creating ? 'Processing...' : 'Payment Successful!'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            {creating ? (
-              <>
-                <div className="flex items-center justify-center mb-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal"></div>
-                </div>
-                <p className="text-muted-foreground">
-                  Creating your bookings and sending confirmations...
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-muted-foreground">
-                  Thank you for your payment. Your booking{createdBookings.length !== 1 ? 's have' : ' has'} been confirmed and you will receive confirmation emails shortly.
-                </p>
-
-                {createdBookings.length > 0 && (
-                  <div className="bg-muted/50 p-4 rounded-lg">
-                    <h4 className="font-semibold mb-2">Bookings Created:</h4>
-                    <div className="space-y-2 text-sm">
-                      {createdBookings.map((booking, index) => (
-                        <div key={index} className="flex justify-between items-center">
-                          <span>{booking.service_title}</span>
-                          <span className="text-teal font-medium">${booking.price}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-4">
-                  <Calendar className="w-4 h-4" />
-                  <span>Your bookings are now available in "My Bookings"</span>
-                </div>
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <User className="w-4 h-4" />
-                  <span>Service providers have been notified</span>
-                </div>
-              </>
-            )}
-            
-            <div className="flex gap-4 justify-center pt-4">
-              <Button 
-                onClick={handleViewDashboard} 
-                className="bg-teal hover:bg-teal/90"
-                disabled={creating}
-              >
-                View Dashboard
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleViewBookings}
-                disabled={creating}
-              >
-                View My Bookings
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal mx-auto mb-4"></div>
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     </div>
   );

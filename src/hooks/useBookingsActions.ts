@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -57,6 +56,19 @@ export const useBookingsActions = () => {
 
           actualProviderId = serviceData.provider_id as string;
           console.log('Found actual provider_id:', actualProviderId);
+        }
+
+        // Validate that the provider exists and is approved
+        const { data: providerData, error: providerError } = await supabase
+          .from('provider_profiles')
+          .select('user_id, verification_status')
+          .eq('user_id', actualProviderId)
+          .eq('verification_status', 'approved')
+          .single();
+
+        if (providerError || !providerData) {
+          console.error('Provider validation failed:', providerError);
+          throw new Error(`Provider not found or not approved for service ${item.service_title}`);
         }
 
         const bookingData: Database['public']['Tables']['bookings']['Insert'] = {
