@@ -8,9 +8,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, isBefore, startOfDay, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { format, addDays, isBefore, startOfDay, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getYear, getMonth, setYear, setMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface BookingFlowProps {
@@ -109,7 +110,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
       
       const cartItem = {
         service_id: service.id,
-        provider_id: provider.user_id, // Use the actual user_id from provider
+        provider_id: provider.user_id,
         service_title: service.title,
         provider_name: provider.business_name,
         price: provider.price,
@@ -120,7 +121,6 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
 
       console.log('🛒 Adding item to cart:', cartItem);
 
-      // Call addItem and wait for the result
       const success = await addItem(cartItem);
 
       console.log('🛒 Add to cart result:', success);
@@ -153,11 +153,29 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     );
   };
 
+  const handleYearChange = (year: string) => {
+    setCurrentMonth(setYear(currentMonth, parseInt(year)));
+  };
+
+  const handleMonthChange = (month: string) => {
+    setCurrentMonth(setMonth(currentMonth, parseInt(month)));
+  };
+
   const getDaysInMonth = () => {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
     return eachDayOfInterval({ start, end });
   };
+
+  // Generate year options (current year + next 2 years)
+  const currentYear = getYear(new Date());
+  const yearOptions = Array.from({ length: 3 }, (_, i) => currentYear + i);
+
+  // Month names
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
   const renderCalendar = () => {
     const days = getDaysInMonth();
@@ -165,8 +183,8 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     
     return (
       <div className="bg-card rounded-lg border p-4">
-        {/* Calendar Header */}
-        <div className="flex items-center justify-between mb-4">
+        {/* Enhanced Calendar Header with Month/Year Selectors */}
+        <div className="flex items-center justify-between mb-6">
           <Button
             variant="ghost"
             size="sm"
@@ -176,9 +194,33 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
             <ChevronLeft className="h-4 w-4" />
           </Button>
           
-          <h3 className="font-semibold text-lg">
-            {format(currentMonth, 'MMMM yyyy')}
-          </h3>
+          <div className="flex items-center gap-2">
+            <Select value={getMonth(currentMonth).toString()} onValueChange={handleMonthChange}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthNames.map((month, index) => (
+                  <SelectItem key={index} value={index.toString()}>
+                    {month}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select value={getYear(currentMonth).toString()} onValueChange={handleYearChange}>
+              <SelectTrigger className="w-20">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           
           <Button
             variant="ghost"
@@ -199,8 +241,13 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
           ))}
         </div>
 
-        {/* Calendar Days */}
+        {/* Calendar Days Grid */}
         <div className="grid grid-cols-7 gap-1">
+          {/* Add padding days for proper alignment */}
+          {Array.from({ length: startOfMonth(currentMonth).getDay() }).map((_, index) => (
+            <div key={`empty-${index}`} className="h-10"></div>
+          ))}
+          
           {days.map((date) => {
             const isToday = format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
             const isSelected = selectedDate && format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
@@ -225,6 +272,15 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
             );
           })}
         </div>
+
+        {/* Selected Date Display */}
+        {selectedDate && (
+          <div className="mt-4 p-3 bg-accent/50 rounded-lg">
+            <p className="text-sm font-medium">
+              Selected Date: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+            </p>
+          </div>
+        )}
       </div>
     );
   };
@@ -298,7 +354,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
               </CardContent>
             </Card>
 
-            {/* Calendar Selection */}
+            {/* Dynamic Calendar Selection */}
             <Card>
               <CardHeader>
                 <CardTitle>
