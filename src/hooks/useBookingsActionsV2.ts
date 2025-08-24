@@ -34,7 +34,8 @@ export const useBookingsActionsV2 = () => {
         throw new Error('Failed to fetch booking details');
       }
 
-      if (booking.provider_id !== user.id) {
+      // FIX: use provider_user_id (schema) instead of provider_id
+      if (booking.provider_user_id !== user.id) {
         throw new Error('You are not authorized to accept this booking');
       }
 
@@ -97,7 +98,8 @@ export const useBookingsActionsV2 = () => {
         throw new Error('Failed to fetch booking details');
       }
 
-      if (booking.provider_id !== user.id) {
+      // FIX: use provider_user_id instead of provider_id
+      if (booking.provider_user_id !== user.id) {
         throw new Error('You are not authorized to update this booking');
       }
 
@@ -160,7 +162,8 @@ export const useBookingsActionsV2 = () => {
         throw new Error('Failed to fetch booking details');
       }
 
-      if (booking.provider_id !== user.id) {
+      // FIX: use provider_user_id instead of provider_id
+      if (booking.provider_user_id !== user.id) {
         throw new Error('You are not authorized to complete this booking');
       }
 
@@ -223,7 +226,8 @@ export const useBookingsActionsV2 = () => {
         throw new Error('Failed to fetch booking details');
       }
 
-      if (booking.provider_id !== user.id) {
+      // FIX: use provider_user_id instead of provider_id
+      if (booking.provider_user_id !== user.id) {
         throw new Error('You are not authorized to cancel this booking');
       }
 
