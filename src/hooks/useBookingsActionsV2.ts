@@ -1,4 +1,3 @@
-
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -33,7 +32,7 @@ export const useBookingsActionsV2 = () => {
   const { user } = useAuth();
 
   // Accept booking
-  const acceptBooking = useMutation({
+  const acceptBooking = (useMutation as any)({
     mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }): Promise<Booking> => {
       console.log('🔄 Accepting booking:', bookingId);
       
@@ -102,7 +101,7 @@ export const useBookingsActionsV2 = () => {
   });
 
   // Mark in progress
-  const markInProgress = useMutation({
+  const markInProgress = (useMutation as any)({
     mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }): Promise<Booking> => {
       console.log('🔄 Marking booking in progress:', bookingId);
       
@@ -170,7 +169,7 @@ export const useBookingsActionsV2 = () => {
   });
 
   // Complete booking
-  const completeBooking = useMutation({
+  const completeBooking = (useMutation as any)({
     mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }): Promise<Booking> => {
       console.log('🔄 Completing booking:', bookingId);
       
@@ -239,7 +238,7 @@ export const useBookingsActionsV2 = () => {
   });
 
   // Cancel booking
-  const cancelBooking = useMutation({
+  const cancelBooking = (useMutation as any)({
     mutationFn: async ({ bookingId, reason }: CancelBookingParams): Promise<Booking> => {
       console.log('🔄 Cancelling booking:', bookingId, 'Reason:', reason);
       
