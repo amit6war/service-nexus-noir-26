@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatError } from "@/lib/errorFormatter";
@@ -170,13 +171,19 @@ export const useSlotBooking = () => {
 
   const checkSlotAvailability = async (slotId: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase
-        .from('slots' as any)
+      // Cast supabase to any to access the slots table
+      const sb = supabase as any;
+      const { data, error } = await sb
+        .from('slots')
         .select('status')
         .eq('id', slotId)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error checking slot availability:', error);
+        return false;
+      }
+      
       return data?.status === 'AVAILABLE';
     } catch (error) {
       console.error('❌ Error checking slot availability:', error);
@@ -189,7 +196,9 @@ export const useSlotBooking = () => {
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) return [];
 
-      const { data, error } = await (supabase as any)
+      // Cast supabase to any to access the reservations table
+      const sb = supabase as any;
+      const { data, error } = await sb
         .from('reservations')
         .select(`
           id,
@@ -206,7 +215,11 @@ export const useSlotBooking = () => {
         .eq('status', 'HOLD')
         .gt('hold_expires_at', new Date().toISOString());
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching active reservations:', error);
+        return [];
+      }
+      
       return data || [];
     } catch (error) {
       console.error('❌ Error fetching active reservations:', error);
