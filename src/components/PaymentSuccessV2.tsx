@@ -1,270 +1,270 @@
-// Enhanced PaymentSuccess component with production-grade error handling
+
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Calendar, User, AlertCircle, RefreshCw } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { CheckCircle, Package, User, Clock, MapPin, ArrowRight } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
-import { useBookingsActionsV2 } from '@/hooks/useBookingsActionsV2';
-import { useToast } from '@/hooks/use-toast';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { validateData, CheckoutDataSchema } from '@/lib/validation';
-import { handleError } from '@/lib/errors';
-import type { CartItem, Address } from '@/types';
+import { toast } from '@/hooks/use-toast';
+
+// Define the CartItem type inline to ensure we have the correct structure
+interface CartItem {
+  id: string;
+  service_id: string;
+  provider_id: string;
+  service_title: string;
+  provider_name: string;
+  price: number;
+  duration_minutes: number;
+  scheduled_date: string;
+  special_instructions?: string;
+}
 
 const PaymentSuccessV2 = () => {
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { clearCart } = useShoppingCart();
-  const { createBookingsFromCart } = useBookingsActionsV2();
-  const { toast } = useToast();
-  
-  const [creating, setCreating] = useState(false);
-  const [bookingsCreated, setBookingsCreated] = useState(false);
-  const [paymentProcessed, setPaymentProcessed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [retryAttempts, setRetryAttempts] = useState(0);
-  const [createdBookings, setCreatedBookings] = useState<CartItem[]>([]);
-
-  const processPaymentSuccess = async (isRetry = false) => {
-    const pendingItems = sessionStorage.getItem('pendingCheckoutItems');
-    const pendingAddress = sessionStorage.getItem('pendingCheckoutAddress');
-    
-    if (!pendingItems || !pendingAddress) {
-      setError('No payment data found. Please contact support if you were charged.');
-      return;
-    }
-
-    if (bookingsCreated && !isRetry) {
-      return;
-    }
-
-    try {
-      setCreating(true);
-      setError(null);
-      console.log('🎯 Processing successful payment and creating bookings...');
-      
-      const rawItems = JSON.parse(pendingItems);
-      const rawAddress = JSON.parse(pendingAddress);
-      
-      // Ensure all required fields are present and properly typed
-      const itemsWithIds: CartItem[] = rawItems.map((item: any, index: number) => {
-        // Use type assertion after ensuring all required fields are present
-        const processedItem = {
-          id: item.id || `temp-${index}-${Date.now()}`,
-          service_id: item.service_id || '',
-          provider_id: item.provider_id || '',
-          service_title: item.service_title || '',
-          provider_name: item.provider_name || '',
-          price: Number(item.price) || 0,
-          duration_minutes: Number(item.duration_minutes) || 0,
-          scheduled_date: item.scheduled_date || new Date().toISOString(),
-          special_instructions: item.special_instructions || ''
-        } as CartItem;
-        
-        return processedItem;
-      });
-      
-      // Validate checkout data
-      const checkoutData = validateData(CheckoutDataSchema, {
-        items: itemsWithIds,
-        address: rawAddress
-      });
-      
-      setPaymentProcessed(true);
-      
-      const result = await createBookingsFromCart(checkoutData.items, checkoutData.address);
-      
-      if (result.success) {
-        // Clear stored data and cart
-        clearCart();
-        sessionStorage.removeItem('pendingCheckoutItems');
-        sessionStorage.removeItem('pendingCheckoutAddress');
-        sessionStorage.removeItem('checkoutTimestamp');
-        
-        setBookingsCreated(true);
-        setCreatedBookings(checkoutData.items);
-        
-        toast({
-          title: 'Payment & Booking Successful!',
-          description: `${checkoutData.items.length} booking${checkoutData.items.length !== 1 ? 's' : ''} created successfully. You will receive confirmation emails shortly.`,
-        });
-        
-        console.log('✅ Bookings created successfully from payment');
-      } else {
-        throw new Error(result.error || 'Failed to create bookings after payment');
-      }
-      
-    } catch (error) {
-      const appError = handleError(error);
-      console.error('❌ Error creating bookings after payment:', appError);
-      setError(appError.message);
-      
-      toast({
-        title: 'Booking Creation Failed',
-        description: 'Your payment was processed successfully, but we encountered an issue creating your bookings. Our team has been notified and will process a refund within 3-5 business days if needed.',
-        variant: 'destructive',
-        duration: 10000
-      });
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleRetry = async () => {
-    if (retryAttempts >= 3) {
-      toast({
-        title: 'Maximum Retries Reached',
-        description: 'Please contact support for assistance. We will ensure your payment is properly handled.',
-        variant: 'destructive'
-      });
-      return;
-    }
-    
-    setRetryAttempts(prev => prev + 1);
-    await processPaymentSuccess(true);
-  };
-
-  const handleViewBookings = () => {
-    navigate('/customer-dashboard?tab=bookings');
-  };
-
-  const handleViewDashboard = () => {
-    navigate('/customer-dashboard');
-  };
+  const { clearCart, setItems } = useShoppingCart();
+  const [checkoutData, setCheckoutData] = useState<{
+    items: CartItem[];
+    address: any;
+    totalAmount: number;
+  } | null>(null);
 
   useEffect(() => {
-    processPaymentSuccess();
-  }, []);
+    const sessionId = searchParams.get('session_id');
+    const success = searchParams.get('success');
 
-  if (error && paymentProcessed) {
+    if (success === 'true' && sessionId) {
+      // Retrieve stored checkout data
+      const pendingItems = localStorage.getItem('pendingCheckoutItems');
+      const pendingAddress = localStorage.getItem('pendingCheckoutAddress');
+      const pendingAmount = localStorage.getItem('pendingCheckoutAmount');
+
+      console.log('Payment success - retrieving stored data:', { pendingItems, pendingAddress, pendingAmount });
+
+      if (pendingItems && pendingAddress && pendingAmount) {
+        try {
+          const rawItems = JSON.parse(pendingItems);
+          const rawAddress = JSON.parse(pendingAddress);
+          
+          // Ensure all required fields are present and properly typed
+          const itemsWithIds: CartItem[] = rawItems.map((item: any, index: number): CartItem => ({
+            id: item.id || `temp-${index}-${Date.now()}`,
+            service_id: item.service_id || '',
+            provider_id: item.provider_id || '',
+            service_title: item.service_title || 'Unknown Service',
+            provider_name: item.provider_name || 'Unknown Provider',
+            price: Number(item.price) || 0,
+            duration_minutes: Number(item.duration_minutes) || 0,
+            scheduled_date: item.scheduled_date || new Date().toISOString(),
+            special_instructions: item.special_instructions || ''
+          }));
+          
+          // Validate checkout data
+          if (itemsWithIds.length > 0) {
+            setCheckoutData({
+              items: itemsWithIds,
+              address: rawAddress,
+              totalAmount: parseFloat(pendingAmount)
+            });
+
+            // Clear the cart and stored data
+            clearCart();
+            setItems([]);
+            
+            // Clean up localStorage
+            localStorage.removeItem('pendingCheckoutItems');
+            localStorage.removeItem('pendingCheckoutAddress');
+            localStorage.removeItem('pendingCheckoutAmount');
+
+            toast({
+              title: "Payment Successful!",
+              description: "Your booking has been confirmed. You will receive a confirmation email shortly.",
+            });
+          } else {
+            console.warn('No valid items found in stored checkout data');
+            navigate('/customer-dashboard');
+          }
+        } catch (error) {
+          console.error('Error parsing stored checkout data:', error);
+          navigate('/customer-dashboard');
+        }
+      } else {
+        console.warn('Missing stored checkout data for payment success');
+        navigate('/customer-dashboard');
+      }
+    } else {
+      console.warn('Invalid payment success parameters');
+      navigate('/customer-dashboard');
+    }
+  }, [searchParams, navigate, clearCart, setItems]);
+
+  if (!checkoutData) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="container mx-auto px-4">
-          <Card className="max-w-md mx-auto border-destructive">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
-                <AlertCircle className="w-8 h-8 text-destructive" />
-              </div>
-              <CardTitle className="text-2xl font-bold text-destructive">
-                Booking Creation Failed
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-center space-y-4">
-              <p className="text-muted-foreground">
-                Your payment was processed successfully, but we encountered an issue creating your bookings.
-              </p>
-              
-              <div className="bg-muted/50 p-4 rounded-lg text-sm space-y-2">
-                <p className="font-semibold">What happens next:</p>
-                <ul className="text-left space-y-1">
-                  <li>• Our team has been automatically notified</li>
-                  <li>• We will attempt to create your bookings manually</li>
-                  <li>• If unsuccessful, a full refund will be processed within 3-5 business days</li>
-                  <li>• You will receive email updates on the status</li>
-                </ul>
-              </div>
-
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium">Error Details:</p>
-                <p className="bg-muted p-2 rounded text-xs font-mono">{error}</p>
-              </div>
-              
-              <div className="flex gap-4 justify-center pt-4">
-                {retryAttempts < 3 && (
-                  <Button 
-                    onClick={handleRetry} 
-                    variant="outline"
-                    disabled={creating}
-                    className="flex items-center gap-2"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${creating ? 'animate-spin' : ''}`} />
-                    Retry ({retryAttempts + 1}/3)
-                  </Button>
-                )}
-                <Button 
-                  onClick={handleViewDashboard} 
-                  className="bg-teal hover:bg-teal/90"
-                >
-                  Go to Dashboard
-                </Button>
-              </div>
-
-              <p className="text-xs text-muted-foreground mt-4">
-                Need immediate help? Contact our support team with your payment confirmation.
-              </p>
-            </CardContent>
-          </Card>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Processing your payment...</p>
         </div>
       </div>
     );
   }
 
+  const { items, address, totalAmount } = checkoutData;
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="container mx-auto px-4">
-        <Card className="max-w-md mx-auto">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <CardTitle className="text-2xl font-bold text-green-600">
-              {creating ? 'Processing...' : 'Payment Successful!'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            {creating ? (
-              <>
-                <LoadingSpinner size="lg" text="Creating your bookings and sending confirmations..." />
-              </>
-            ) : (
-              <>
-                <p className="text-muted-foreground">
-                  Thank you for your payment. Your booking{createdBookings.length !== 1 ? 's have' : ' has'} been confirmed and you will receive confirmation emails shortly.
-                </p>
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Success Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-10 h-10 text-green-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Payment Successful!</h1>
+          <p className="text-muted-foreground text-lg">
+            Your booking has been confirmed. We'll send you updates via email.
+          </p>
+        </motion.div>
 
-                {createdBookings.length > 0 && (
-                  <div className="bg-muted/50 p-4 rounded-lg">
-                    <h4 className="font-semibold mb-2">Bookings Created:</h4>
-                    <div className="space-y-2 text-sm">
-                      {createdBookings.map((booking, index) => (
-                        <div key={booking.id || index} className="flex justify-between items-center">
-                          <span>{booking.service_title}</span>
-                          <span className="text-teal font-medium">${booking.price}</span>
+        {/* Booking Details */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Services Booked */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="w-5 h-5 text-teal" />
+                  Services Booked
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {items.map((item, index) => (
+                  <div key={item.id} className="space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-foreground">{item.service_title}</h3>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                          <div className="flex items-center gap-1">
+                            <User className="w-4 h-4" />
+                            <span>{item.provider_name}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{item.duration_minutes} min</span>
+                          </div>
                         </div>
-                      ))}
+                        <div className="text-sm text-muted-foreground mt-1">
+                          <span>Scheduled: {new Date(item.scheduled_date).toLocaleString()}</span>
+                        </div>
+                        {item.special_instructions && (
+                          <div className="text-sm text-muted-foreground mt-1">
+                            <span className="font-medium">Notes: </span>
+                            {item.special_instructions}
+                          </div>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="ml-2">
+                        ${item.price}
+                      </Badge>
                     </div>
+                    {index < items.length - 1 && <Separator />}
                   </div>
-                )}
+                ))}
+              </CardContent>
+            </Card>
+          </motion.div>
 
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-4">
-                  <Calendar className="w-4 h-4" />
-                  <span>Your bookings are now available in "My Bookings"</span>
+          {/* Service Address & Summary */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="space-y-6"
+          >
+            {/* Service Address */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-teal" />
+                  Service Address
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm">
+                  <p className="font-medium">{address.full_name}</p>
+                  <p>{address.street_address}</p>
+                  {address.apartment && <p>{address.apartment}</p>}
+                  <p>{address.city}, {address.state} {address.zip_code}</p>
+                  {address.phone && <p className="mt-2">Phone: {address.phone}</p>}
                 </div>
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <User className="w-4 h-4" />
-                  <span>Service providers have been notified</span>
+              </CardContent>
+            </Card>
+
+            {/* Payment Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal ({items.length} service{items.length !== 1 ? 's' : ''})</span>
+                    <span>${items.reduce((sum, item) => sum + item.price, 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Service fee</span>
+                    <span>${(totalAmount - items.reduce((sum, item) => sum + item.price, 0)).toFixed(2)}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between font-semibold">
+                    <span>Total Paid</span>
+                    <span>${totalAmount.toFixed(2)}</span>
+                  </div>
                 </div>
-              </>
-            )}
-            
-            <div className="flex gap-4 justify-center pt-4">
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
+        {/* Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mt-8 text-center space-y-4"
+        >
+          <div className="bg-muted/50 rounded-lg p-4">
+            <p className="text-sm text-muted-foreground mb-3">
+              What's next? Your service providers will contact you within 24 hours to confirm the appointment details.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button 
-                onClick={handleViewDashboard} 
+                onClick={() => navigate('/customer-dashboard?tab=bookings')}
                 className="bg-teal hover:bg-teal/90"
-                disabled={creating}
-              >
-                View Dashboard
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleViewBookings}
-                disabled={creating}
               >
                 View My Bookings
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => navigate('/customer-dashboard')}
+              >
+                Back to Dashboard
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </motion.div>
       </div>
     </div>
   );

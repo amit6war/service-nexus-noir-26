@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import CustomerDashboard from "./pages/CustomerDashboard";
@@ -27,26 +28,28 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
-          <ErrorBoundary>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/customer-dashboard" element={<CustomerDashboard />} />
-                <Route path="/provider-dashboard" element={<ProviderDashboard />} />
-                <Route path="/admin-dashboard" element={<AdminDashboard />} />
-                <Route path="/provider-profile" element={<ProviderProfile />} />
-                <Route path="/provider/:id" element={<ProviderDetail />} />
-                <Route path="/checkout" element={<CheckoutV2 />} />
-                <Route path="/checkout-v1" element={<Checkout />} />
-                <Route path="/payment-success" element={<PaymentSuccessV2 />} />
-                <Route path="/payment-success-v1" element={<PaymentSuccess />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </ErrorBoundary>
+          <AuthProvider>
+            <ErrorBoundary>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/customer-dashboard" element={<CustomerDashboard />} />
+                  <Route path="/provider-dashboard" element={<ProviderDashboard />} />
+                  <Route path="/admin-dashboard" element={<AdminDashboard />} />
+                  <Route path="/provider-profile" element={<ProviderProfile />} />
+                  <Route path="/provider/:id" element={<ProviderDetail />} />
+                  <Route path="/checkout" element={<CheckoutV2 />} />
+                  <Route path="/checkout-v1" element={<Checkout />} />
+                  <Route path="/payment-success" element={<PaymentSuccessV2 />} />
+                  <Route path="/payment-success-v1" element={<PaymentSuccess />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </ErrorBoundary>
+          </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

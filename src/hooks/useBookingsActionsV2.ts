@@ -1,234 +1,297 @@
-
-// Production-grade booking actions with comprehensive error handling
-import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
-import { apiService } from '@/services/api';
-import { validateData, BookingSchema, CartItemSchema } from '@/lib/validation';
-import { AuthenticationError, BookingError, handleError } from '@/lib/errors';
-import type { Database } from '@/integrations/supabase/types';
-import type { CartItem, Booking, Address } from '@/types';
+import { toast } from '@/hooks/use-toast';
+import { useAuth } from './useAuth';
 
-interface BookingOperationResult {
-  success: boolean;
-  data?: Booking[];
-  error?: string;
+interface Booking {
+  id: string;
+  service_id: string;
+  provider_id: string;
+  customer_id: string;
+  scheduled_date: string;
+  status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+  customer_notes?: string;
+  provider_notes?: string;
+  accepted_at?: string;
+  completed_at?: string;
+  cancelled_at?: string;
+}
+
+interface CancelBookingParams {
+  bookingId: string;
+  reason: string;
 }
 
 export const useBookingsActionsV2 = () => {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
 
-  const createBookingsFromCart = async (
-    cartItems: CartItem[], 
-    address: Address
-  ): Promise<BookingOperationResult> => {
-    if (!user?.id) {
-      const error = new AuthenticationError('User not authenticated');
-      toast({
-        title: 'Authentication Required',
-        description: error.message,
-        variant: 'destructive'
-      });
-      return { success: false, error: error.message };
-    }
-
-    setLoading(true);
-    const createdBookings: Booking[] = [];
-    
-    try {
-      console.log('📝 Creating bookings from cart:', cartItems.length, 'items');
-
-      // Validate input data
-      const validatedItems = cartItems.map(item => 
-        validateData(CartItemSchema, item)
-      );
-
-      // Create bookings sequentially for better error handling
-      for (const item of validatedItems) {
-        let actualProviderId = item.provider_id;
-
-        // Validate provider ID format and fetch if needed
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(item.provider_id)) {
-          console.log('🔍 Fetching provider for service:', item.service_id);
-          
-          const serviceResult = await apiService.query('services', 
-            supabase
-              .from('services')
-              .select('provider_id')
-              .eq('id', item.service_id)
-              .single()
-          );
-
-          if (!serviceResult.success || !serviceResult.data) {
-            throw new BookingError(`Service not found: ${item.service_title}`);
-          }
-
-          actualProviderId = (serviceResult.data as any).provider_id;
-        }
-
-        // Create booking data with validation
-        const bookingData: Database['public']['Tables']['bookings']['Insert'] = {
-          customer_id: user.id,
-          provider_user_id: actualProviderId,
-          service_id: item.service_id,
-          service_date: item.scheduled_date,
-          duration_minutes: item.duration_minutes,
-          final_price: item.price,
-          platform_fee: Math.round(item.price * 0.1 * 100) / 100,
-          provider_earnings: Math.round(item.price * 0.9 * 100) / 100,
-          special_instructions: item.special_instructions || '',
-          service_address: `${address.address_line_1}${address.address_line_2 ? ', ' + address.address_line_2 : ''}, ${address.city}, ${address.state} ${address.postal_code}`,
-          service_city: address.city,
-          service_state: address.state,
-          service_zip: address.postal_code,
-          booking_number: `BK-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
-        };
-
-        console.log('💾 Creating booking:', bookingData.booking_number);
-
-        const bookingResult = await apiService.mutate<Booking>(() => 
-          supabase
-            .from('bookings')
-            .insert(bookingData)
-            .select()
-            .single()
-        );
-
-        if (!bookingResult.success || !bookingResult.data) {
-          throw new BookingError(`Failed to create booking for ${item.service_title}: ${bookingResult.error}`);
-        }
-
-        createdBookings.push(bookingResult.data);
-        console.log('✅ Booking created:', bookingResult.data.booking_number);
+  const acceptBooking = useMutation({
+    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
+      console.log('🔄 Accepting booking:', bookingId);
+      
+      if (!user) {
+        throw new Error('User not authenticated');
       }
 
-      toast({
-        title: 'Bookings Created Successfully',
-        description: `${createdBookings.length} booking${createdBookings.length > 1 ? 's' : ''} created successfully.`
-      });
+      // Update booking status to accepted
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'accepted',
+          accepted_at: new Date().toISOString(),
+          provider_notes: notes || null
+        })
+        .eq('id', bookingId)
+        .eq('provider_id', user.id)
+        .select()
+        .single();
 
-      return { success: true, data: createdBookings };
+      if (error) {
+        console.error('❌ Error accepting booking:', error);
+        throw error;
+      }
 
-    } catch (error) {
-      console.error('❌ Error creating bookings:', error);
+      return data;
+    },
+    onSuccess: async (data) => {
+      console.log('✅ Booking accepted successfully:', data);
       
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      // Add status history entry
+      try {
+        await supabase
+          .from('booking_status_history')
+          .insert({
+            booking_id: data.id,
+            old_status: 'pending',
+            new_status: 'accepted',
+            changed_by: user?.id || '',
+            notes: 'Booking accepted by provider'
+          });
+      } catch (error) {
+        console.warn('⚠️ Failed to add status history:', error);
+      }
+
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
       
       toast({
-        title: 'Error Creating Bookings',
-        description: errorMessage,
-        variant: 'destructive'
+        title: "Booking Accepted",
+        description: "The booking has been accepted successfully. The customer will be notified.",
       });
+    },
+    onError: (error) => {
+      console.error('❌ Failed to accept booking:', error);
+      toast({
+        title: "Error",
+        description: "Failed to accept booking. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
 
-      // If some bookings were created but not all, we should handle partial success
-      if (createdBookings.length > 0) {
-        console.warn('⚠️ Partial success: Created', createdBookings.length, 'out of', cartItems.length, 'bookings');
-        
-        toast({
-          title: 'Partial Success',
-          description: `Created ${createdBookings.length} out of ${cartItems.length} bookings. Please check your booking history.`,
-          variant: 'destructive'
-        });
+  const markInProgress = useMutation({
+    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
+      console.log('🔄 Marking booking in progress:', bookingId);
+      
+      if (!user) {
+        throw new Error('User not authenticated');
       }
 
-      return { success: false, error: errorMessage, data: createdBookings.length > 0 ? createdBookings : undefined };
-    } finally {
-      setLoading(false);
-    }
-  };
+      // Update booking status to in_progress
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'in_progress',
+          provider_notes: notes || null
+        })
+        .eq('id', bookingId)
+        .eq('provider_id', user.id)
+        .select()
+        .single();
 
-  const confirmBooking = async (bookingId: string): Promise<boolean> => {
-    if (!user?.id) {
-      throw new AuthenticationError('User not authenticated');
-    }
-
-    setLoading(true);
-    try {
-      const result = await apiService.mutate(() =>
-        supabase
-          .from('bookings')
-          .update({ 
-            status: 'confirmed',
-            confirmed_at: new Date().toISOString()
-          } as Database['public']['Tables']['bookings']['Update'])
-          .eq('id', bookingId)
-          .eq('customer_id', user.id)
-      );
-
-      if (!result.success) {
-        throw new BookingError(`Failed to confirm booking: ${result.error}`);
+      if (error) {
+        console.error('❌ Error marking booking in progress:', error);
+        throw error;
       }
 
-      toast({
-        title: 'Booking Confirmed',
-        description: 'Your service has been confirmed successfully.'
-      });
-
-      return true;
-    } catch (error) {
-      const appError = handleError(error);
-      toast({
-        title: 'Error',
-        description: appError.message,
-        variant: 'destructive'
-      });
-      throw appError;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const cancelBooking = async (bookingId: string, reason?: string): Promise<boolean> => {
-    if (!user?.id) {
-      throw new AuthenticationError('User not authenticated');
-    }
-
-    setLoading(true);
-    try {
-      const result = await apiService.mutate(() =>
-        supabase
-          .from('bookings')
-          .update({ 
-            status: 'cancelled',
-            cancelled_at: new Date().toISOString(),
-            cancelled_by: user.id,
-            cancellation_reason: reason
-          } as Database['public']['Tables']['bookings']['Update'])
-          .eq('id', bookingId)
-          .eq('customer_id', user.id)
-      );
-
-      if (!result.success) {
-        throw new BookingError(`Failed to cancel booking: ${result.error}`);
+      return data;
+    },
+    onSuccess: async (data) => {
+      console.log('✅ Booking marked in progress successfully:', data);
+      
+      // Add status history entry
+      try {
+        await supabase
+          .from('booking_status_history')
+          .insert({
+            booking_id: data.id,
+            old_status: 'accepted',
+            new_status: 'in_progress',
+            changed_by: user?.id || '',
+            notes: 'Service started by provider'
+          });
+      } catch (error) {
+        console.warn('⚠️ Failed to add status history:', error);
       }
 
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+      
       toast({
-        title: 'Booking Cancelled',
-        description: 'Your booking has been cancelled successfully.'
+        title: "Status Updated",
+        description: "The booking is now marked as in progress.",
       });
-
-      return true;
-    } catch (error) {
-      const appError = handleError(error);
+    },
+    onError: (error) => {
+      console.error('❌ Failed to mark booking in progress:', error);
       toast({
-        title: 'Error',
-        description: appError.message,
-        variant: 'destructive'
+        title: "Error",
+        description: "Failed to update booking status. Please try again.",
+        variant: "destructive",
       });
-      throw appError;
-    } finally {
-      setLoading(false);
     }
-  };
+  });
+
+  const completeBooking = useMutation({
+    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
+      console.log('🔄 Completing booking:', bookingId);
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Update booking status to completed
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          provider_notes: notes || null
+        })
+        .eq('id', bookingId)
+        .eq('provider_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error completing booking:', error);
+        throw error;
+      }
+
+      return data;
+    },
+    onSuccess: async (data) => {
+      console.log('✅ Booking completed successfully:', data);
+      
+      // Add status history entry
+      try {
+        await supabase
+          .from('booking_status_history')
+          .insert({
+            booking_id: data.id,
+            old_status: 'in_progress',
+            new_status: 'completed',
+            changed_by: user?.id || '',
+            notes: 'Service completed by provider'
+          });
+      } catch (error) {
+        console.warn('⚠️ Failed to add status history:', error);
+      }
+
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+      
+      toast({
+        title: "Booking Completed",
+        description: "The booking has been marked as completed successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('❌ Failed to complete booking:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete booking. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const cancelBooking = useMutation({
+    mutationFn: async ({ bookingId, reason }: CancelBookingParams) => {
+      console.log('🔄 Cancelling booking:', bookingId, 'Reason:', reason);
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Update booking status to cancelled
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString(),
+          customer_notes: reason
+        })
+        .eq('id', bookingId)
+        .eq('customer_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error cancelling booking:', error);
+        throw error;
+      }
+
+      return data;
+    },
+    onSuccess: async (data) => {
+      console.log('✅ Booking cancelled successfully:', data);
+      
+      // Add status history entry
+      try {
+        await supabase
+          .from('booking_status_history')
+          .insert({
+            booking_id: data.id,
+            old_status: 'pending',
+            new_status: 'cancelled',
+            changed_by: user?.id || '',
+            notes: 'Booking cancelled by customer',
+          });
+      } catch (error) {
+        console.warn('⚠️ Failed to add status history:', error);
+      }
+
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-bookings'] });
+      
+      toast({
+        title: "Booking Cancelled",
+        description: "The booking has been cancelled successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('❌ Failed to cancel booking:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel booking. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
 
   return {
-    createBookingsFromCart,
-    confirmBooking,
-    cancelBooking,
-    loading
+    acceptBooking,
+    markInProgress,
+    completeBooking,
+    cancelBooking: cancelBooking, // Keep existing cancelBooking if it exists
+    isLoading: acceptBooking.isPending || markInProgress.isPending || completeBooking.isPending
   };
 };
