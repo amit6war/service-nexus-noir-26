@@ -35,7 +35,6 @@ serve(async (req) => {
       }
     }
 
-    // Create Supabase client with anon key for user authentication
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
@@ -43,33 +42,22 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      console.error("No authorization header found");
       throw new Error("No authorization header");
     }
 
-    console.log("Authorization header found, extracting token...");
     const token = authHeader.replace("Bearer ", "");
-    
-    console.log("Getting user with token...");
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     
-    if (userError) {
-      console.error("User authentication error:", userError);
-      throw new Error(`Authentication failed: ${userError.message}`);
-    }
-    
-    if (!userData?.user) {
-      console.error("No user data returned");
-      throw new Error("User not found");
+    if (userError || !userData?.user) {
+      throw new Error("User not authenticated");
     }
 
-    console.log("User authenticated successfully:", userData.user.email);
+    console.log("User authenticated:", userData.user.email);
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
 
-    // Check for existing customer
     const customers = await stripe.customers.list({ 
       email: userData.user.email!, 
       limit: 1 
@@ -80,7 +68,7 @@ serve(async (req) => {
       customerId = customers.data[0].id;
       console.log("Found existing customer:", customerId);
     } else {
-      console.log("No existing customer found, will create during checkout");
+      console.log("Creating new customer");
     }
 
     // Create enhanced line items with complete service information
