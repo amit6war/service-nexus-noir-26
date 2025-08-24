@@ -47,16 +47,16 @@ const PaymentSuccessV2 = () => {
       const rawItems = JSON.parse(pendingItems);
       const rawAddress = JSON.parse(pendingAddress);
       
-      // Add missing id field to cart items if not present
-      const itemsWithIds = rawItems.map((item: any, index: number) => ({
+      // Ensure all required fields are present and properly typed
+      const itemsWithIds: CartItem[] = rawItems.map((item: any, index: number) => ({
         id: item.id || `temp-${index}-${Date.now()}`,
-        service_id: item.service_id,
-        provider_id: item.provider_id,
-        service_title: item.service_title,
-        provider_name: item.provider_name,
-        price: item.price,
-        duration_minutes: item.duration_minutes,
-        scheduled_date: item.scheduled_date,
+        service_id: item.service_id || '',
+        provider_id: item.provider_id || '',
+        service_title: item.service_title || '',
+        provider_name: item.provider_name || '',
+        price: Number(item.price) || 0,
+        duration_minutes: Number(item.duration_minutes) || 0,
+        scheduled_date: item.scheduled_date || new Date().toISOString(),
         special_instructions: item.special_instructions || ''
       }));
       
