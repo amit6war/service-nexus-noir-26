@@ -2,11 +2,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// Lightweight Redis client for Edge
-import {
-  connect as connectRedis,
-  Redis,
-} from "https://deno.land/x/redis@v0.32.5/mod.ts";
+// Note: remove static Redis import to avoid build-time fetch failures
+// We'll load Redis dynamically only when needed.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,25 +30,37 @@ function parseRedisUrl(url: string) {
   }
 }
 
-async function withRedis<T>(fn: (redis: Redis) => Promise<T>): Promise<T> {
+// Helper: conditionally get a Redis client via dynamic import.
+// If anything fails (missing URL, import error, connection failure), we gracefully return null.
+async function withRedis<T>(fn: (redis: any | null) => Promise<T>): Promise<T> {
   if (!REDIS_URL) {
-    return await fn(null as unknown as Redis);
+    return await fn(null);
   }
   const cfg = parseRedisUrl(REDIS_URL);
   if (!cfg) {
-    return await fn(null as unknown as Redis);
+    return await fn(null);
   }
-  const redis = await connectRedis({
-    hostname: cfg.hostname,
-    port: cfg.port,
-    password: cfg.password,
-    tls: cfg.tls ? {} : undefined,
-  });
+
+  let redis: any | null = null;
+  try {
+    const mod = await import("https://deno.land/x/redis@v0.36.0/mod.ts");
+    const connect = (mod as any).connect as (opts: any) => Promise<any>;
+    redis = await connect({
+      hostname: cfg.hostname,
+      port: cfg.port,
+      password: cfg.password,
+      tls: cfg.tls ? {} : undefined,
+    });
+  } catch (e) {
+    console.log("[reserve] Redis unavailable, continuing without it", { error: e instanceof Error ? e.message : String(e) });
+    return await fn(null);
+  }
+
   try {
     return await fn(redis);
   } finally {
     try {
-      redis.close();
+      redis?.close?.();
     } catch {}
   }
 }
@@ -98,18 +107,18 @@ serve(async (req) => {
     const user = userRes.user;
     log("User authenticated", { userId: user.id, slotId });
 
-    // Acquire short Redis lock (if REDIS is configured)
+    // Acquire short Redis lock (if available)
     const lockKey = `lock:slot:${slotId}`;
     const requestId = crypto.randomUUID();
     const ttlSeconds = 30;
 
-    const acquire = async (redis: Redis | null) => {
-      if (!redis) return true; // If no Redis configured, skip locking.
+    const acquire = async (redis: any | null) => {
+      if (!redis) return true; // If no Redis configured/available, skip locking.
       const ok = await redis.set(lockKey, requestId, { ex: ttlSeconds, nx: true });
       return ok === "OK";
     };
 
-    const release = async (redis: Redis | null) => {
+    const release = async (redis: any | null) => {
       if (!redis) return;
       // delete only if value matches requestId
       const lua = `

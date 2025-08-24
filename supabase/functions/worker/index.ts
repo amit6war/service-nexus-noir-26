@@ -2,11 +2,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import {
-  connect as connectRedis,
-  Redis,
-} from "https://deno.land/x/redis@v0.32.5/mod.ts";
 
+// Remove static Redis import; use dynamic import with graceful fallback
 const REDIS_URL = Deno.env.get("REDIS_URL") || "";
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2023-10-16" });
 
@@ -32,16 +29,23 @@ function parseRedisUrl(url: string) {
   }
 }
 
-async function getRedis(): Promise<Redis | null> {
+async function getRedis(): Promise<any | null> {
   if (!REDIS_URL) return null;
   const cfg = parseRedisUrl(REDIS_URL);
   if (!cfg) return null;
-  return await connectRedis({
-    hostname: cfg.hostname,
-    port: cfg.port,
-    password: cfg.password,
-    tls: cfg.tls ? {} : undefined,
-  });
+  try {
+    const mod = await import("https://deno.land/x/redis@v0.36.0/mod.ts");
+    const connect = (mod as any).connect as (opts: any) => Promise<any>;
+    return await connect({
+      hostname: cfg.hostname,
+      port: cfg.port,
+      password: cfg.password,
+      tls: cfg.tls ? {} : undefined,
+    });
+  } catch (e) {
+    console.log("[worker] Redis unavailable", { error: e instanceof Error ? e.message : String(e) });
+    return null;
+  }
 }
 
 serve(async (req) => {

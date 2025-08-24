@@ -1,10 +1,8 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
-import {
-  connect as connectRedis,
-} from "https://deno.land/x/redis@v0.32.5/mod.ts";
 
+// Remove static Redis import; we'll dynamic import when needed
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
 const REDIS_URL = Deno.env.get("REDIS_URL") || "";
 
@@ -42,20 +40,26 @@ serve(async (req) => {
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2023-10-16" });
     const event = stripe.webhooks.constructEvent(bodyText, signature, STRIPE_WEBHOOK_SECRET);
 
-    // Enqueue to Redis for async processing
+    // Enqueue to Redis for async processing (if configured and available)
     if (REDIS_URL) {
       const cfg = parseRedisUrl(REDIS_URL);
       if (cfg) {
-        const redis = await connectRedis({
-          hostname: cfg.hostname,
-          port: cfg.port,
-          password: cfg.password,
-          tls: cfg.tls ? {} : undefined,
-        });
         try {
-          await redis.lpush("queue:webhooks", JSON.stringify(event));
-        } finally {
-          try { redis.close(); } catch {}
+          const mod = await import("https://deno.land/x/redis@v0.36.0/mod.ts");
+          const connect = (mod as any).connect as (opts: any) => Promise<any>;
+          const redis = await connect({
+            hostname: cfg.hostname,
+            port: cfg.port,
+            password: cfg.password,
+            tls: cfg.tls ? {} : undefined,
+          });
+          try {
+            await redis.lpush("queue:webhooks", JSON.stringify(event));
+          } finally {
+            try { redis?.close?.(); } catch {}
+          }
+        } catch (e) {
+          console.log("[stripe-webhook] Redis enqueue failed, continuing without queue", { error: e instanceof Error ? e.message : String(e) });
         }
       }
     }
