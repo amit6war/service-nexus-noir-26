@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
 type UUID = string;
@@ -68,6 +68,28 @@ export const useBookingsActions = () => {
       const customerId = userData.user.id;
       const service_address = formatServiceAddress(address);
 
+      console.log('Creating bookings with items:', items);
+      console.log('Customer ID:', customerId);
+
+      // Validate that all provider_ids are valid UUIDs
+      for (const item of items) {
+        if (!item.provider_id || typeof item.provider_id !== 'string') {
+          throw new Error(`Invalid provider ID: ${item.provider_id}`);
+        }
+        
+        // Check if provider exists in the system
+        const { data: providerExists, error: providerError } = await supabase
+          .from('provider_profiles')
+          .select('user_id')
+          .eq('user_id', item.provider_id)
+          .single();
+
+        if (providerError || !providerExists) {
+          console.error('Provider validation failed:', { provider_id: item.provider_id, error: providerError });
+          throw new Error(`Provider not found: ${item.provider_id}`);
+        }
+      }
+
       // Build typed booking rows (omit status to use DB default 'pending')
       const rows: BookingInsert[] = items.map((item) => ({
         customer_id: customerId,
@@ -85,6 +107,8 @@ export const useBookingsActions = () => {
         service_zip: address.zip_code ?? null,
       }));
 
+      console.log('Inserting booking rows:', rows);
+
       setLoading(true);
       try {
         const { data, error } = await supabase
@@ -93,8 +117,11 @@ export const useBookingsActions = () => {
           .select('id, booking_number, status, service_date, final_price');
 
         if (error) {
+          console.error('Booking creation error:', error);
           throw new Error(error.message);
         }
+
+        console.log('Bookings created successfully:', data);
 
         toast({
           title: 'Bookings created',

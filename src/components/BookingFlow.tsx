@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Calendar, Clock, User, Star, DollarSign, CalendarIcon, AlertCircle } from 'lucide-react';
+import { X, Calendar, Clock, User, Star, DollarSign, CalendarIcon, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,7 +10,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, isBefore, startOfDay } from 'date-fns';
+import { format, addDays, isBefore, startOfDay, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface BookingFlowProps {
@@ -31,6 +31,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [loading, setLoading] = useState(false);
   const [conflictError, setConflictError] = useState('');
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   
   const { addItem } = useShoppingCart();
   const { toast } = useToast();
@@ -45,18 +46,18 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     '17:00', '17:30', '18:00'
   ];
 
-  // Mock booked slots - simulating backend data
+  // Mock booked slots - using real provider user_id
   const bookedSlots = [
-    { provider_id: provider.id, date: format(new Date(), 'yyyy-MM-dd'), time: '10:00' },
-    { provider_id: provider.id, date: format(addDays(new Date(), 1), 'yyyy-MM-dd'), time: '14:00' },
-    { provider_id: provider.id, date: format(addDays(new Date(), 2), 'yyyy-MM-dd'), time: '09:00' },
-    { provider_id: provider.id, date: format(addDays(new Date(), 2), 'yyyy-MM-dd'), time: '15:30' },
+    { provider_id: provider.user_id, date: format(new Date(), 'yyyy-MM-dd'), time: '10:00' },
+    { provider_id: provider.user_id, date: format(addDays(new Date(), 1), 'yyyy-MM-dd'), time: '14:00' },
+    { provider_id: provider.user_id, date: format(addDays(new Date(), 2), 'yyyy-MM-dd'), time: '09:00' },
+    { provider_id: provider.user_id, date: format(addDays(new Date(), 2), 'yyyy-MM-dd'), time: '15:30' },
   ];
 
   const checkTimeSlotAvailability = (date: Date, time: string) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return !bookedSlots.some(slot => 
-      slot.provider_id === provider.id && 
+      slot.provider_id === provider.user_id && 
       slot.date === dateStr && 
       slot.time === time
     );
@@ -108,7 +109,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
       
       const cartItem = {
         service_id: service.id,
-        provider_id: provider.user_id || provider.id,
+        provider_id: provider.user_id, // Use the actual user_id from provider
         service_title: service.title,
         provider_name: provider.business_name,
         price: provider.price,
@@ -119,14 +120,13 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
 
       console.log('🛒 Adding item to cart:', cartItem);
 
-      // Call addItem and wait for the result (now it returns a Promise)
+      // Call addItem and wait for the result
       const success = await addItem(cartItem);
 
       console.log('🛒 Add to cart result:', success);
 
       if (success) {
         console.log('✅ Successfully added to cart - closing booking flow');
-        // Close the booking flow immediately after successful addition
         onComplete();
       } else {
         console.log('❌ Failed to add to cart');
@@ -147,13 +147,95 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
     return isBefore(startOfDay(date), startOfDay(new Date()));
   };
 
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => 
+      direction === 'prev' ? subMonths(prev, 1) : addMonths(prev, 1)
+    );
+  };
+
+  const getDaysInMonth = () => {
+    const start = startOfMonth(currentMonth);
+    const end = endOfMonth(currentMonth);
+    return eachDayOfInterval({ start, end });
+  };
+
+  const renderCalendar = () => {
+    const days = getDaysInMonth();
+    const today = new Date();
+    
+    return (
+      <div className="bg-card rounded-lg border p-4">
+        {/* Calendar Header */}
+        <div className="flex items-center justify-between mb-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigateMonth('prev')}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <h3 className="font-semibold text-lg">
+            {format(currentMonth, 'MMMM yyyy')}
+          </h3>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigateMonth('next')}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Days of Week Header */}
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+            <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Days */}
+        <div className="grid grid-cols-7 gap-1">
+          {days.map((date) => {
+            const isToday = format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+            const isSelected = selectedDate && format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+            const isDisabled = isDateDisabled(date);
+            
+            return (
+              <Button
+                key={format(date, 'yyyy-MM-dd')}
+                variant={isSelected ? 'default' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-10 w-full",
+                  isSelected && "bg-teal hover:bg-teal/90 text-white",
+                  isToday && !isSelected && "bg-accent text-accent-foreground",
+                  isDisabled && "opacity-50 cursor-not-allowed"
+                )}
+                onClick={() => !isDisabled && handleDateSelect(date)}
+                disabled={isDisabled}
+              >
+                {format(date, 'd')}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-card rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-card rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto"
       >
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
@@ -163,7 +245,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Service & Provider Summary */}
             <Card>
               <CardHeader>
@@ -216,44 +298,26 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
               </CardContent>
             </Card>
 
-            {/* Schedule Your Service */}
+            {/* Calendar Selection */}
             <Card>
               <CardHeader>
-                <CardTitle>Schedule Your Service</CardTitle>
+                <CardTitle>
+                  <Calendar className="w-4 h-4 inline mr-2" />
+                  Select Date *
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderCalendar()}
+              </CardContent>
+            </Card>
+
+            {/* Time & Instructions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Complete Booking</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {/* Date Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-3">
-                      <Calendar className="w-4 h-4 inline mr-2" />
-                      Select Date *
-                    </label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !selectedDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={handleDateSelect}
-                          disabled={isDateDisabled}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
                   {/* Time Slot Selection */}
                   {selectedDate && (
                     <div>
@@ -261,7 +325,7 @@ const BookingFlow: React.FC<BookingFlowProps> = ({
                         <Clock className="w-4 h-4 inline mr-2" />
                         Select Time Slot *
                       </label>
-                      <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                      <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                         {timeSlots.map((time) => {
                           const isAvailable = checkTimeSlotAvailability(selectedDate, time);
                           const isSelected = selectedTimeSlot === time;
