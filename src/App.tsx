@@ -3,137 +3,54 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { useState } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import ProviderDashboard from "./pages/ProviderDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProviderProfile from "./pages/ProviderProfile";
-import Checkout from "./pages/Checkout";
 import ProviderDetail from "./pages/ProviderDetail";
-import PaymentSuccess from "./components/PaymentSuccess";
 import NotFound from "./pages/NotFound";
+import Checkout from "./pages/Checkout";
+import CheckoutV2 from "./pages/CheckoutV2";
+import PaymentSuccess from "./components/PaymentSuccess";
+import PaymentSuccessV2 from "./components/PaymentSuccessV2";
+import ErrorBoundary from "./components/ErrorBoundary";
+import "./App.css";
 
-// Protected Route Component
-const ProtectedRoute = ({ children, requireAuth = true }: { children: React.ReactNode, requireAuth?: boolean }) => {
-  const { user, loading } = useAuth();
+const queryClient = new QueryClient();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-navy flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-teal border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (requireAuth && !user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  if (!requireAuth && user) {
-    return <Navigate to="/customer-dashboard" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-const AppRoutes = () => {
-  return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route 
-        path="/auth" 
-        element={
-          <ProtectedRoute requireAuth={false}>
-            <Auth />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/customer-dashboard" 
-        element={
-          <ProtectedRoute>
-            <CustomerDashboard />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/provider-dashboard" 
-        element={
-          <ProtectedRoute>
-            <ProviderDashboard />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/admin-dashboard" 
-        element={
-          <ProtectedRoute>
-            <AdminDashboard />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/provider-profile" 
-        element={
-          <ProtectedRoute>
-            <ProviderProfile />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/provider-profile/:providerId" 
-        element={<ProviderDetail />} 
-      />
-      <Route 
-        path="/checkout" 
-        element={
-          <ProtectedRoute>
-            <Checkout />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/payment-success" 
-        element={
-          <ProtectedRoute>
-            <PaymentSuccess />
-          </ProtectedRoute>
-        } 
-      />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-};
-
-const AppContent = () => {
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 1000 * 60 * 5, // 5 minutes
-        retry: 1,
-      },
-    },
-  }));
-
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <AppRoutes />
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <TooltipProvider>
+          <ErrorBoundary>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/customer-dashboard" element={<CustomerDashboard />} />
+                <Route path="/provider-dashboard" element={<ProviderDashboard />} />
+                <Route path="/admin-dashboard" element={<AdminDashboard />} />
+                <Route path="/provider-profile" element={<ProviderProfile />} />
+                <Route path="/provider/:id" element={<ProviderDetail />} />
+                <Route path="/checkout" element={<CheckoutV2 />} />
+                <Route path="/checkout-v1" element={<Checkout />} />
+                <Route path="/payment-success" element={<PaymentSuccessV2 />} />
+                <Route path="/payment-success-v1" element={<PaymentSuccess />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </ErrorBoundary>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
-};
-
-const App = () => <AppContent />;
+}
 
 export default App;
