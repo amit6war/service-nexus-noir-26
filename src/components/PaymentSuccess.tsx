@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
@@ -6,6 +5,7 @@ import { useBookingsActions } from '@/hooks/useBookingsActions';
 import { useToast } from '@/hooks/use-toast';
 import BookingResultModal from './BookingResultModal';
 import { useAuth } from '@/hooks/useAuth';
+import { formatError } from '@/lib/errorFormatter';
 
 const PAYMENT_PROCESSED_FLAG = 'payment_success_processed';
 
@@ -91,10 +91,12 @@ const PaymentSuccess = () => {
         throw new Error('Failed to create bookings after payment');
       }
     } catch (err) {
-      console.error('❌ Error creating bookings after payment:', err);
-      setError(`Booking creation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const friendly = formatError(err);
+      console.error('❌ Error creating bookings after payment:', err, '->', friendly);
+      setError(`Booking creation failed: ${friendly}`);
       setShowModal(true);
 
+      // Keep toast wording the same (no UI change), but logs have details
       toast({
         title: 'Booking Creation Failed',
         description:

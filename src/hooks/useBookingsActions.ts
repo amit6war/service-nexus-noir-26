@@ -1,8 +1,10 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
+import { formatError } from '@/lib/errorFormatter';
 
 export interface CartItem {
   id: string;
@@ -101,6 +103,7 @@ export const useBookingsActions = () => {
 
         if (error) {
           console.error('❌ Error creating booking:', error);
+          // Let outer catch wrap with readable message
           throw error;
         }
 
@@ -114,8 +117,10 @@ export const useBookingsActions = () => {
 
       return true;
     } catch (error) {
-      console.error('❌ Error in createBookingsFromCart:', error);
-      throw error;
+      const msg = formatError(error);
+      console.error('❌ Error in createBookingsFromCart:', error, '->', msg);
+      // Throw a clean Error so PaymentSuccess shows the exact details
+      throw new Error(msg);
     } finally {
       setLoading(false);
     }
@@ -144,13 +149,14 @@ export const useBookingsActions = () => {
         description: 'Your service has been confirmed successfully.'
       });
     } catch (error) {
-      console.error('Error confirming booking:', error);
+      const msg = formatError(error);
+      console.error('Error confirming booking:', error, '->', msg);
       toast({
         title: 'Error',
         description: 'Failed to confirm booking. Please try again.',
         variant: 'destructive'
       });
-      throw error;
+      throw new Error(msg);
     } finally {
       setLoading(false);
     }
@@ -181,13 +187,14 @@ export const useBookingsActions = () => {
         description: 'Your booking has been cancelled successfully.'
       });
     } catch (error) {
-      console.error('Error cancelling booking:', error);
+      const msg = formatError(error);
+      console.error('Error cancelling booking:', error, '->', msg);
       toast({
         title: 'Error',
         description: 'Failed to cancel booking. Please try again.',
         variant: 'destructive'
       });
-      throw error;
+      throw new Error(msg);
     } finally {
       setLoading(false);
     }
