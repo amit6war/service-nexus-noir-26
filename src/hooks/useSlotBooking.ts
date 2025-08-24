@@ -6,7 +6,7 @@ const FUNCTIONS_BASE = "https://jpvjdpgtpjbrkcamyqie.supabase.co/functions/v1";
 
 export interface ReservationResult {
   reservationId: string;
-  expiresAt: string; // ISO string
+  holdExpiresAt: string; // ISO string
 }
 
 export const useReservationTimer = (expiresAt?: string | null) => {
@@ -49,13 +49,13 @@ export const useReservationTimer = (expiresAt?: string | null) => {
 export const useSlotBooking = () => {
   const [loading, setLoading] = useState(false);
 
-  const reserveSlot = async (params: { slotId: string; serviceId?: string; providerId?: string; holdMinutes?: number; }): Promise<ReservationResult> => {
+  const reserveSlot = async (params: { slotId: string; holdMinutes?: number; }): Promise<ReservationResult> => {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error("Not authenticated");
 
     setLoading(true);
     try {
-      const res = await fetch(`${FUNCTIONS_BASE}/reserve-slot`, {
+      const res = await fetch(`${FUNCTIONS_BASE}/reserve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -68,46 +68,51 @@ export const useSlotBooking = () => {
       if (!res.ok) {
         throw new Error(json?.error || "Failed to reserve slot");
       }
-      return { reservationId: json.reservationId, expiresAt: json.expiresAt };
+      return { reservationId: json.reservationId, holdExpiresAt: json.holdExpiresAt };
     } finally {
       setLoading(false);
     }
   };
 
-  const initiatePayment = async (reservationId: string): Promise<{ clientSecret: string; paymentIntentId: string; }> => {
+  const initiateCheckout = async (reservationId: string): Promise<{ url: string; sessionId: string; }> => {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error("Not authenticated");
 
     setLoading(true);
     try {
-      const res = await fetch(`${FUNCTIONS_BASE}/create-payment-intent-slots`, {
+      const origin = window.location.origin;
+      const res = await fetch(`${FUNCTIONS_BASE}/pay`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ reservationId }),
+        body: JSON.stringify({
+          reservationId,
+          successUrl: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${origin}/checkout`,
+        }),
       });
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json?.error || "Failed to create payment intent");
+        throw new Error(json?.error || "Failed to create checkout session");
       }
-      return { clientSecret: json.clientSecret, paymentIntentId: json.paymentIntentId };
+      return { url: json.url, sessionId: json.sessionId };
     } finally {
       setLoading(false);
     }
   };
 
-  // Realtime subscription for booking events
+  // Realtime subscription for events table
   const subscribeToEvents = (onEvent: (payload: any) => void) => {
     const channel = supabase
-      .channel("booking-events")
+      .channel("events")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "booking_events" },
+        { event: "INSERT", schema: "public", table: "events" },
         (payload) => {
-          console.log("[booking_events] new event", payload);
+          console.log("[events] new event", payload);
           onEvent?.(payload.new);
         }
       )
@@ -121,7 +126,7 @@ export const useSlotBooking = () => {
   return {
     loading,
     reserveSlot,
-    initiatePayment,
+    initiateCheckout,
     subscribeToEvents,
   };
 };
