@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, User, Download, Star, CheckCircle, XCircle, AlertCircle, Edit, RotateCcw } from 'lucide-react';
@@ -49,12 +50,12 @@ const MyBookings = () => {
     try {
       setLoading(true);
       
-      // Enhanced query to get service and provider information
+      // Updated query to use the correct foreign key relationship
       const { data, error } = await supabase
         .from('bookings')
         .select(`
           *,
-          services!inner (
+          services (
             title,
             provider_id
           ),
@@ -76,7 +77,7 @@ const MyBookings = () => {
       }
 
       console.log('Loaded bookings with enhanced data:', data);
-      // Convert the Supabase response to our Booking type
+      // Convert the Supabase response to our Booking type with proper null handling
       const bookingsData: Booking[] = (data || []).map(booking => ({
         ...booking,
         services: booking.services || null,
