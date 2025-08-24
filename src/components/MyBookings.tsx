@@ -48,6 +48,7 @@ const MyBookings = () => {
 
     try {
       setLoading(true);
+      console.log('Loading bookings for customer:', user.id);
       
       // First fetch bookings with services
       const { data: bookingsData, error: bookingsError } = await supabase

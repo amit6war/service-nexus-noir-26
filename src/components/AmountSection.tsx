@@ -41,13 +41,39 @@ const AmountSection = () => {
     }
   }, [user]);
 
+  // Set up real-time subscription for payments updates
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('payments-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payments',
+          filter: `customer_id=eq.${user.id}`
+        },
+        () => {
+          console.log('Payment change detected, refreshing amount section...');
+          loadPaymentSummary();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const loadPaymentSummary = async () => {
     if (!user) return;
 
     try {
       setLoading(true);
 
-      // Fetch payment data with booking details
+      // Fetch payment data with booking details - real-time update
       const { data: payments, error } = await supabase
         .from('payments')
         .select(`
@@ -57,16 +83,12 @@ const AmountSection = () => {
           payment_status,
           refund_amount,
           processed_at,
-          bookings (
-            booking_number,
-            services (
-              title
-            )
-          )
+          created_at,
+          booking_id
         `)
         .eq('customer_id', user.id)
-        .order('processed_at', { ascending: false })
-        .limit(10);
+        .order('created_at', { ascending: false })
+        .limit(20);
 
       if (error) {
         console.error('Error loading payment summary:', error);
@@ -87,17 +109,37 @@ const AmountSection = () => {
         return sum + (payment.refund_amount || 0);
       }, 0) || 0;
 
-      // Format recent payments
-      const recentPayments: PaymentRecord[] = (payments || []).map(payment => ({
-        id: payment.id,
-        amount: payment.amount || 0,
-        currency: payment.currency || 'USD',
-        payment_status: payment.payment_status,
-        refund_amount: payment.refund_amount || 0,
-        processed_at: payment.processed_at || '',
-        booking_number: payment.bookings?.booking_number,
-        service_title: payment.bookings?.services?.title
-      }));
+      // Get booking details for each payment
+      const recentPayments: PaymentRecord[] = [];
+      
+      for (const payment of payments || []) {
+        let booking_number = '';
+        let service_title = 'Service';
+        
+        if (payment.booking_id) {
+          const { data: booking } = await supabase
+            .from('bookings')
+            .select('booking_number, services(title)')
+            .eq('id', payment.booking_id)
+            .maybeSingle();
+          
+          if (booking) {
+            booking_number = booking.booking_number;
+            service_title = (booking as any).services?.title || 'Service';
+          }
+        }
+        
+        recentPayments.push({
+          id: payment.id,
+          amount: payment.amount || 0,
+          currency: payment.currency || 'USD',
+          payment_status: payment.payment_status,
+          refund_amount: payment.refund_amount || 0,
+          processed_at: payment.processed_at || payment.created_at || '',
+          booking_number,
+          service_title
+        });
+      }
 
       setSummary({
         totalSpending,

@@ -71,10 +71,20 @@ export const useBookingsActions = () => {
       console.log('Creating bookings with items:', items);
       console.log('Customer ID:', customerId);
 
-      // Validate that all provider_ids are valid UUIDs
+      // Validate that all provider_ids are valid UUIDs and providers exist
       for (const item of items) {
+        console.log('Validating provider:', item.provider_id);
+        
         if (!item.provider_id || typeof item.provider_id !== 'string') {
-          throw new Error(`Invalid provider ID: ${item.provider_id}`);
+          console.error('Invalid provider ID format:', item.provider_id);
+          throw new Error(`Invalid provider ID format: ${item.provider_id}`);
+        }
+        
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(item.provider_id)) {
+          console.error('Invalid UUID format:', item.provider_id);
+          throw new Error(`Invalid provider UUID format: ${item.provider_id}`);
         }
         
         // Check if provider exists in the system
@@ -82,12 +92,19 @@ export const useBookingsActions = () => {
           .from('provider_profiles')
           .select('user_id')
           .eq('user_id', item.provider_id)
-          .single();
+          .maybeSingle();
 
-        if (providerError || !providerExists) {
-          console.error('Provider validation failed:', { provider_id: item.provider_id, error: providerError });
-          throw new Error(`Provider not found: ${item.provider_id}`);
+        if (providerError) {
+          console.error('Provider lookup error:', { provider_id: item.provider_id, error: providerError });
+          throw new Error(`Provider lookup failed: ${providerError.message}`);
         }
+        
+        if (!providerExists) {
+          console.error('Provider not found:', item.provider_id);
+          throw new Error(`Provider not found in system: ${item.provider_id}`);
+        }
+        
+        console.log('Provider validation successful:', item.provider_id);
       }
 
       // Build typed booking rows (omit status to use DB default 'pending')

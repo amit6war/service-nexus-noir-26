@@ -36,7 +36,9 @@ const CustomerDashboard = () => {
     
     // Handle navigation state
     const state = (window.history.state?.usr);
-    if (state?.tab) {
+    if (state?.activeTab) {
+      setActiveTab(state.activeTab);
+    } else if (state?.tab) {
       setActiveTab(state.tab);
     }
   }, []);

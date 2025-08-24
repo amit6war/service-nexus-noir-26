@@ -99,7 +99,7 @@ const PaymentSuccess = () => {
   };
 
   const handleViewBookings = () => {
-    navigate('/customer-dashboard', { state: { tab: 'bookings' } });
+    navigate('/customer-dashboard', { state: { activeTab: 'bookings' } });
   };
 
   const handleViewDashboard = () => {
