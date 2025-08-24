@@ -28,16 +28,16 @@ export const useBookingsActions = () => {
 
     setLoading(true);
     try {
-      console.log('Creating bookings from cart:', cartItems);
+      console.log('🔄 Creating bookings from cart:', cartItems);
 
       // Create bookings for each cart item
       const bookingPromises = cartItems.map(async (item) => {
         let actualProviderId = item.provider_id;
 
-        // If provider_id is not a valid UUID, fetch from services table
+        // Validate UUID format
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(item.provider_id)) {
-          console.log('Invalid provider_id format, fetching from services table for service_id:', item.service_id);
+          console.log('❌ Invalid provider_id format, fetching from services table for service_id:', item.service_id);
           
           const { data: serviceData, error: serviceError } = await supabase
             .from('services')
@@ -46,7 +46,7 @@ export const useBookingsActions = () => {
             .single();
 
           if (serviceError) {
-            console.error('Error fetching service provider:', serviceError);
+            console.error('❌ Error fetching service provider:', serviceError);
             throw new Error(`Failed to get provider for service ${item.service_title}`);
           }
 
@@ -55,7 +55,7 @@ export const useBookingsActions = () => {
           }
 
           actualProviderId = serviceData.provider_id as string;
-          console.log('Found actual provider_id:', actualProviderId);
+          console.log('✅ Found actual provider_id:', actualProviderId);
         }
 
         // Validate that the provider exists and is approved
@@ -67,9 +67,12 @@ export const useBookingsActions = () => {
           .single();
 
         if (providerError || !providerData) {
-          console.error('Provider validation failed:', providerError);
+          console.error('❌ Provider validation failed:', providerError);
           throw new Error(`Provider not found or not approved for service ${item.service_title}`);
         }
+
+        // Format the address properly
+        const serviceAddress = `${address.address_line_1}${address.address_line_2 ? ', ' + address.address_line_2 : ''}, ${address.city}, ${address.state} ${address.postal_code}`;
 
         const bookingData: Database['public']['Tables']['bookings']['Insert'] = {
           customer_id: user.id,
@@ -78,18 +81,17 @@ export const useBookingsActions = () => {
           service_date: item.scheduled_date,
           duration_minutes: item.duration_minutes,
           final_price: item.price,
-          platform_fee: Math.round(item.price * 0.1 * 100) / 100, // 10% platform fee
-          provider_earnings: Math.round(item.price * 0.9 * 100) / 100, // 90% to provider
+          platform_fee: Math.round(item.price * 0.1 * 100) / 100,
+          provider_earnings: Math.round(item.price * 0.9 * 100) / 100,
           special_instructions: item.special_instructions || '',
-          service_address: `${address.address_line_1}${address.address_line_2 ? ', ' + address.address_line_2 : ''}, ${address.city}, ${address.state} ${address.zip_code}`,
+          service_address: serviceAddress,
           service_city: address.city,
           service_state: address.state,
-          service_zip: address.zip_code,
+          service_zip: address.postal_code,
           booking_number: `BK-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
-          // status omitted to use DB default 'pending'
         };
 
-        console.log('Creating booking with data:', bookingData);
+        console.log('📝 Creating booking with data:', bookingData);
 
         const { data, error } = await supabase
           .from('bookings')
@@ -98,32 +100,22 @@ export const useBookingsActions = () => {
           .single();
 
         if (error) {
-          console.error('Error creating booking:', error);
+          console.error('❌ Error creating booking:', error);
           throw error;
         }
 
-        console.log('Booking created successfully:', data);
+        console.log('✅ Booking created successfully:', data);
         return data;
       });
 
       const createdBookings = await Promise.all(bookingPromises);
       
-      console.log('All bookings created successfully:', createdBookings);
-
-      toast({
-        title: 'Bookings Created Successfully',
-        description: `${createdBookings.length} booking${createdBookings.length > 1 ? 's' : ''} created successfully.`
-      });
+      console.log('🎉 All bookings created successfully:', createdBookings);
 
       return true;
     } catch (error) {
-      console.error('Error in createBookingsFromCart:', error);
-      toast({
-        title: 'Error Creating Bookings',
-        description: error instanceof Error ? error.message : 'An unexpected error occurred',
-        variant: 'destructive'
-      });
-      return false;
+      console.error('❌ Error in createBookingsFromCart:', error);
+      throw error;
     } finally {
       setLoading(false);
     }

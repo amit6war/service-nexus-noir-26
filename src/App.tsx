@@ -1,57 +1,120 @@
-
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import CustomerDashboard from "./pages/CustomerDashboard";
-import ProviderDashboard from "./pages/ProviderDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import ProviderProfile from "./pages/ProviderProfile";
-import ProviderDetail from "./pages/ProviderDetail";
-import NotFound from "./pages/NotFound";
-import Checkout from "./pages/Checkout";
-import CheckoutV2 from "./pages/CheckoutV2";
-import PaymentSuccess from "./components/PaymentSuccess";
-import PaymentSuccessV2 from "./components/PaymentSuccessV2";
-import ErrorBoundary from "./components/ErrorBoundary";
-import "./App.css";
+import ErrorBoundary from "@/components/ErrorBoundary";
+const Home = lazy(() => import("./pages/Home"));
+const Auth = lazy(() => import("./pages/Auth"));
+const CustomerDashboard = lazy(() => import("./pages/CustomerDashboard"));
+const ProviderDashboard = lazy(() => import("./pages/ProviderDashboard"));
+const Service = lazy(() => import("./pages/Service"));
+const Services = lazy(() => import("./pages/Services"));
+const Providers = lazy(() => import("./pages/Providers"));
+const Provider = lazy(() => import("./pages/Provider"));
+const CheckoutV2 = lazy(() => import("./pages/CheckoutV2"));
+
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 
 const queryClient = new QueryClient();
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <AuthProvider>
         <TooltipProvider>
-          <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
             <ErrorBoundary>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/customer-dashboard" element={<CustomerDashboard />} />
-                  <Route path="/provider-dashboard" element={<ProviderDashboard />} />
-                  <Route path="/admin-dashboard" element={<AdminDashboard />} />
-                  <Route path="/provider-profile" element={<ProviderProfile />} />
-                  <Route path="/provider/:id" element={<ProviderDetail />} />
-                  <Route path="/checkout" element={<CheckoutV2 />} />
-                  <Route path="/checkout-v1" element={<Checkout />} />
-                  <Route path="/payment-success" element={<PaymentSuccessV2 />} />
-                  <Route path="/payment-success-v1" element={<PaymentSuccess />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </BrowserRouter>
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Home />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/auth"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Auth />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/customer-dashboard"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <CustomerDashboard />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/provider-dashboard"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <ProviderDashboard />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/service/:serviceId"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Service />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/services"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Services />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/providers"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Providers />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/provider/:providerId"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <Provider />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/checkout"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <CheckoutV2 />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/payment-success"
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <PaymentSuccess />
+                    </Suspense>
+                  }
+                />
+              </Routes>
             </ErrorBoundary>
-          </AuthProvider>
+          </BrowserRouter>
         </TooltipProvider>
-      </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

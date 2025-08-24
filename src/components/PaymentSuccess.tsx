@@ -13,7 +13,6 @@ const PaymentSuccess = () => {
   const { toast } = useToast();
   const [creating, setCreating] = useState(false);
   const [bookingsCreated, setBookingsCreated] = useState(false);
-  const [paymentProcessed, setPaymentProcessed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryAttempts, setRetryAttempts] = useState(0);
   const [showModal, setShowModal] = useState(false);
@@ -23,31 +22,36 @@ const PaymentSuccess = () => {
     const pendingItems = sessionStorage.getItem('pendingCheckoutItems');
     const pendingAddress = sessionStorage.getItem('pendingCheckoutAddress');
     
+    console.log('🔄 Processing payment success - pendingItems:', !!pendingItems, 'pendingAddress:', !!pendingAddress);
+    
     if (!pendingItems || !pendingAddress) {
+      console.log('❌ No pending checkout data found');
       setError('No payment data found. Please contact support if you were charged.');
       setShowModal(true);
       return;
     }
 
     if (bookingsCreated && !isRetry) {
-      return; // Already processed successfully
+      console.log('✅ Bookings already created, skipping');
+      return;
     }
 
     try {
       setCreating(true);
       setError(null);
-      console.log('Processing successful payment and creating bookings...');
+      console.log('🔄 Processing successful payment and creating bookings...');
       
       const items = JSON.parse(pendingItems);
       const address = JSON.parse(pendingAddress);
       
-      // Mark payment as processed
-      setPaymentProcessed(true);
+      console.log('📝 Creating bookings with items:', items.length, 'address:', address);
       
       // Create bookings from the cart data
       const success = await createBookingsFromCart(items, address);
       
       if (success) {
+        console.log('✅ Bookings created successfully');
+        
         // Clear stored data and cart
         clearCart();
         sessionStorage.removeItem('pendingCheckoutItems');
@@ -62,17 +66,16 @@ const PaymentSuccess = () => {
           description: `${items.length} booking${items.length !== 1 ? 's' : ''} created successfully. You will receive confirmation emails shortly.`,
         });
         
-        console.log('Bookings created successfully from payment');
+        console.log('🎉 Payment success process completed');
       } else {
         throw new Error('Failed to create bookings after payment');
       }
       
     } catch (error) {
-      console.error('Error creating bookings after payment:', error);
+      console.error('❌ Error creating bookings after payment:', error);
       setError(`Booking creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setShowModal(true);
       
-      // Show error with refund information
       toast({
         title: 'Booking Creation Failed',
         description: 'Your payment was processed successfully, but we encountered an issue creating your bookings. Our team has been notified and will process a refund within 3-5 business days if needed.',
@@ -107,6 +110,7 @@ const PaymentSuccess = () => {
   };
 
   useEffect(() => {
+    console.log('🚀 PaymentSuccess component mounted, processing payment...');
     processPaymentSuccess();
   }, []);
 
