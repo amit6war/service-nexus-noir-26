@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatError } from "@/lib/errorFormatter";
@@ -8,6 +7,8 @@ const FUNCTIONS_BASE = "https://jpvjdpgtpjbrkcamyqie.supabase.co/functions/v1";
 export interface ReservationResult {
   reservationId: string;
   holdExpiresAt: string; // ISO string
+  // Add expiresAt for compatibility with components expecting this field
+  expiresAt: string; // ISO string
 }
 
 export const useReservationTimer = (expiresAt?: string | null) => {
@@ -81,7 +82,8 @@ export const useSlotBooking = () => {
       console.log('✅ Slot reserved successfully:', json);
       return { 
         reservationId: json.reservationId, 
-        holdExpiresAt: json.holdExpiresAt 
+        holdExpiresAt: json.holdExpiresAt,
+        expiresAt: json.holdExpiresAt, // alias for UI compatibility
       };
       
     } catch (error) {
@@ -139,7 +141,6 @@ export const useSlotBooking = () => {
     }
   };
 
-  // Enhanced realtime subscription with error handling
   const subscribeToEvents = (onEvent: (payload: any) => void) => {
     console.log('🔔 Subscribing to real-time events');
     
@@ -167,14 +168,13 @@ export const useSlotBooking = () => {
     };
   };
 
-  // Utility function to check slot availability
   const checkSlotAvailability = async (slotId: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase
-        .from('slots')
+        .from('slots' as any)
         .select('status')
         .eq('id', slotId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data?.status === 'AVAILABLE';
@@ -184,13 +184,12 @@ export const useSlotBooking = () => {
     }
   };
 
-  // Get user's active reservations
   const getActiveReservations = async () => {
     try {
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) return [];
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('reservations')
         .select(`
           id,

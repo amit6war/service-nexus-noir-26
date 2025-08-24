@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { format, addDays, startOfDay, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 interface Slot {
   id: string;
@@ -37,6 +37,9 @@ export const SlotsManager: React.FC<SlotsManagerProps> = ({ providerId, serviceI
   
   const { toast } = useToast();
 
+  // Use a locally untyped client for tables missing from generated types
+  const sb = supabase as any;
+
   useEffect(() => {
     loadSlots();
   }, [providerId, serviceId]);
@@ -44,7 +47,7 @@ export const SlotsManager: React.FC<SlotsManagerProps> = ({ providerId, serviceI
   const loadSlots = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('slots')
         .select('*')
         .eq('provider_id', providerId)
@@ -53,8 +56,9 @@ export const SlotsManager: React.FC<SlotsManagerProps> = ({ providerId, serviceI
         .order('start_time', { ascending: true });
 
       if (error) throw error;
-      setSlots(data || []);
+      setSlots((data || []) as Slot[]);
     } catch (error) {
+      console.error('Failed to load slots:', error);
       toast({
         title: 'Error',
         description: 'Failed to load slots',
@@ -70,7 +74,7 @@ export const SlotsManager: React.FC<SlotsManagerProps> = ({ providerId, serviceI
       const startDateTime = new Date(`${newSlot.date}T${newSlot.startTime}`);
       const endDateTime = new Date(`${newSlot.date}T${newSlot.endTime}`);
 
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('slots')
         .insert({
           provider_id: providerId,
@@ -84,7 +88,7 @@ export const SlotsManager: React.FC<SlotsManagerProps> = ({ providerId, serviceI
 
       if (error) throw error;
 
-      setSlots([...slots, data]);
+      setSlots([...slots, data as Slot]);
       setShowAddForm(false);
       setNewSlot({
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -97,6 +101,7 @@ export const SlotsManager: React.FC<SlotsManagerProps> = ({ providerId, serviceI
         description: 'Slot created successfully'
       });
     } catch (error) {
+      console.error('Failed to create slot:', error);
       toast({
         title: 'Error',
         description: 'Failed to create slot',
@@ -107,7 +112,7 @@ export const SlotsManager: React.FC<SlotsManagerProps> = ({ providerId, serviceI
 
   const deleteSlot = async (slotId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await sb
         .from('slots')
         .delete()
         .eq('id', slotId);
@@ -120,6 +125,7 @@ export const SlotsManager: React.FC<SlotsManagerProps> = ({ providerId, serviceI
         description: 'Slot deleted successfully'
       });
     } catch (error) {
+      console.error('Failed to delete slot:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete slot',
@@ -195,7 +201,7 @@ export const SlotsManager: React.FC<SlotsManagerProps> = ({ providerId, serviceI
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={createSlot}>Create Slot</Button>
+                  <Button onClick={createSlot} disabled={loading}>Create Slot</Button>
                   <Button variant="outline" onClick={() => setShowAddForm(false)}>
                     Cancel
                   </Button>

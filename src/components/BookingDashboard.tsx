@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, User, MapPin, CreditCard, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, Clock, User } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,9 @@ export const BookingDashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  // Use a locally untyped client to avoid deep type instantiation issues
+  const sb = supabase as any;
+
   useEffect(() => {
     loadUserData();
   }, []);
@@ -61,11 +64,11 @@ export const BookingDashboard: React.FC = () => {
   const loadUserData = async () => {
     try {
       setLoading(true);
-      const { data: session } = await supabase.auth.getSession();
+      const { data: session } = await sb.auth.getSession();
       if (!session.session) return;
 
       // Load bookings
-      const { data: bookingsData, error: bookingsError } = await supabase
+      const { data: bookingsData, error: bookingsError } = await sb
         .from('bookings')
         .select(`
           *,
@@ -88,7 +91,7 @@ export const BookingDashboard: React.FC = () => {
       if (bookingsError) throw bookingsError;
 
       // Load active reservations
-      const { data: reservationsData, error: reservationsError } = await supabase
+      const { data: reservationsData, error: reservationsError } = await sb
         .from('reservations')
         .select(`
           *,
@@ -104,9 +107,10 @@ export const BookingDashboard: React.FC = () => {
 
       if (reservationsError) throw reservationsError;
 
-      setBookings(bookingsData || []);
-      setReservations(reservationsData || []);
+      setBookings((bookingsData || []) as Booking[]);
+      setReservations((reservationsData || []) as Reservation[]);
     } catch (error) {
+      console.error('Failed to load booking data:', error);
       toast({
         title: 'Error',
         description: 'Failed to load booking data',
@@ -272,7 +276,7 @@ export const BookingDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    {reservation.status === 'HOLD' && !isExpired(reservation.hold_expires_at) && (
+                    {reservation.status === 'HOLD' && new Date(reservation.hold_expires_at) > new Date() && (
                       <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
                         <div className="flex items-center gap-2 text-yellow-800">
                           <Clock className="w-4 h-4" />
