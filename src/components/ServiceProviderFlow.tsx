@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Star, MapPin, Clock, User, Calendar, Heart, ShoppingCart, Check } from 'lucide-react';
@@ -8,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { format, addDays, startOfDay, isSameDay, parseISO } from 'date-fns';
 
 interface Service {
   id: string;
@@ -51,14 +53,75 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState<'providers' | 'booking'>('providers');
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
-  const [scheduledDate, setScheduledDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [providers, setProviders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [existingBookings, setExistingBookings] = useState<any[]>([]);
+  const [availableDates, setAvailableDates] = useState<Date[]>([]);
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
 
   const { addItem } = useShoppingCart();
   const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const { toast } = useToast();
+
+  // Generate available dates (next 30 days)
+  useEffect(() => {
+    const dates = [];
+    for (let i = 0; i < 30; i++) {
+      dates.push(addDays(new Date(), i));
+    }
+    setAvailableDates(dates);
+  }, []);
+
+  // Generate available times
+  useEffect(() => {
+    const times = [];
+    for (let hour = 8; hour <= 18; hour++) {
+      times.push(`${hour.toString().padStart(2, '0')}:00`);
+      if (hour < 18) {
+        times.push(`${hour.toString().padStart(2, '0')}:30`);
+      }
+    }
+    setAvailableTimes(times);
+  }, []);
+
+  // Load existing bookings for the selected provider
+  useEffect(() => {
+    const loadExistingBookings = async () => {
+      if (!selectedProvider) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('bookings')
+          .select('service_date')
+          .eq('provider_user_id', selectedProvider.user_id)
+          .gte('service_date', new Date().toISOString());
+
+        if (error) {
+          console.error('Error loading bookings:', error);
+          return;
+        }
+
+        setExistingBookings(data || []);
+      } catch (error) {
+        console.error('Error loading bookings:', error);
+      }
+    };
+
+    loadExistingBookings();
+  }, [selectedProvider]);
+
+  // Check if a time slot is booked
+  const isTimeSlotBooked = (date: Date, time: string) => {
+    const dateTimeString = `${format(date, 'yyyy-MM-dd')}T${time}:00`;
+    return existingBookings.some(booking => {
+      const bookingDate = parseISO(booking.service_date);
+      const checkDate = parseISO(dateTimeString);
+      return Math.abs(bookingDate.getTime() - checkDate.getTime()) < 60000; // Within 1 minute
+    });
+  };
 
   // Mock providers data - in real app this would come from API
   useEffect(() => {
@@ -132,7 +195,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
   };
 
   const handleAddToCart = async () => {
-    if (!selectedProvider || !scheduledDate) {
+    if (!selectedProvider || !selectedDate || !selectedTime) {
       toast({
         title: 'Missing Information',
         description: 'Please select a date and time for your service.',
@@ -141,6 +204,8 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
       return;
     }
 
+    const scheduledDateTime = `${selectedDate}T${selectedTime}:00`;
+
     const cartItem = {
       service_id: selectedService.id,
       provider_id: selectedProvider.user_id,
@@ -148,7 +213,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
       provider_name: selectedProvider.business_name,
       price: selectedProvider.hourly_rate,
       duration_minutes: selectedService.duration_minutes,
-      scheduled_date: scheduledDate,
+      scheduled_date: scheduledDateTime,
       special_instructions: specialInstructions
     };
 
@@ -278,7 +343,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
     );
   }
 
-  // Booking step
+  // Booking step with calendar functionality
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -326,27 +391,62 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
           </CardContent>
         </Card>
 
-        {/* Booking Form */}
+        {/* Booking Form with Calendar */}
         <Card>
           <CardHeader>
             <CardTitle>Schedule Your Service</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* Date Selection */}
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-3">
                   <Calendar className="w-4 h-4 inline mr-1" />
-                  Select Date & Time
+                  Select Date
                 </label>
-                <input
-                  type="datetime-local"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  min={new Date().toISOString().slice(0, 16)}
-                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-teal"
-                  required
-                />
+                <div className="grid grid-cols-7 gap-2">
+                  {availableDates.slice(0, 14).map((date, index) => (
+                    <Button
+                      key={index}
+                      variant={selectedDate === format(date, 'yyyy-MM-dd') ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-16 flex flex-col"
+                      onClick={() => setSelectedDate(format(date, 'yyyy-MM-dd'))}
+                    >
+                      <span className="text-xs">{format(date, 'EEE')}</span>
+                      <span className="text-sm font-bold">{format(date, 'd')}</span>
+                    </Button>
+                  ))}
+                </div>
               </div>
+
+              {/* Time Selection */}
+              {selectedDate && (
+                <div>
+                  <label className="block text-sm font-medium mb-3">
+                    <Clock className="w-4 h-4 inline mr-1" />
+                    Select Time
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {availableTimes.map((time) => {
+                      const isBooked = isTimeSlotBooked(new Date(selectedDate), time);
+                      return (
+                        <Button
+                          key={time}
+                          variant={selectedTime === time ? 'default' : 'outline'}
+                          size="sm"
+                          disabled={isBooked}
+                          className={`${isBooked ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : ''}`}
+                          onClick={() => !isBooked && setSelectedTime(time)}
+                        >
+                          {time}
+                          {isBooked && <span className="ml-1 text-xs">(Booked)</span>}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium mb-2">
@@ -363,7 +463,7 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
               <Button 
                 onClick={handleAddToCart}
                 className="w-full bg-teal hover:bg-teal/90 h-12"
-                disabled={!scheduledDate}
+                disabled={!selectedDate || !selectedTime}
               >
                 <ShoppingCart className="w-5 h-5 mr-2" />
                 Add to Cart - ${selectedProvider?.hourly_rate}
