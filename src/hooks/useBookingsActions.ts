@@ -1,8 +1,10 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
+import { formatError } from '@/lib/errorFormatter';
 
 export interface CartItem {
   id: string;
@@ -15,6 +17,15 @@ export interface CartItem {
   duration_minutes: number;
   special_instructions?: string;
 }
+
+// Generate a compact booking number that always fits in VARCHAR(20)
+const generateBookingNumber = () => {
+  // Format: BK + base36(timestamp) + 4 random chars (uppercase), no separators
+  const ts = Date.now().toString(36).toUpperCase(); // ~8-10 chars
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase(); // 4 chars
+  const code = `BK${ts}${rand}`; // ~14-16 chars, well under 20
+  return code.length <= 20 ? code : code.slice(0, 20);
+};
 
 export const useBookingsActions = () => {
   const { user } = useAuth();
@@ -88,7 +99,7 @@ export const useBookingsActions = () => {
           service_city: address.city,
           service_state: address.state,
           service_zip: address.postal_code,
-          booking_number: `BK-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+          booking_number: generateBookingNumber(), // FIX: ensure <= VARCHAR(20)
         };
 
         console.log('📝 Creating booking with data:', bookingData);
@@ -101,6 +112,7 @@ export const useBookingsActions = () => {
 
         if (error) {
           console.error('❌ Error creating booking:', error);
+          // Let outer catch wrap with readable message
           throw error;
         }
 
@@ -114,8 +126,10 @@ export const useBookingsActions = () => {
 
       return true;
     } catch (error) {
-      console.error('❌ Error in createBookingsFromCart:', error);
-      throw error;
+      const msg = formatError(error);
+      console.error('❌ Error in createBookingsFromCart:', error, '->', msg);
+      // Throw a clean Error so PaymentSuccess shows the exact details
+      throw new Error(msg);
     } finally {
       setLoading(false);
     }
@@ -144,13 +158,14 @@ export const useBookingsActions = () => {
         description: 'Your service has been confirmed successfully.'
       });
     } catch (error) {
-      console.error('Error confirming booking:', error);
+      const msg = formatError(error);
+      console.error('Error confirming booking:', error, '->', msg);
       toast({
         title: 'Error',
         description: 'Failed to confirm booking. Please try again.',
         variant: 'destructive'
       });
-      throw error;
+      throw new Error(msg);
     } finally {
       setLoading(false);
     }
@@ -181,13 +196,14 @@ export const useBookingsActions = () => {
         description: 'Your booking has been cancelled successfully.'
       });
     } catch (error) {
-      console.error('Error cancelling booking:', error);
+      const msg = formatError(error);
+      console.error('Error cancelling booking:', error, '->', msg);
       toast({
         title: 'Error',
         description: 'Failed to cancel booking. Please try again.',
         variant: 'destructive'
       });
-      throw error;
+      throw new Error(msg);
     } finally {
       setLoading(false);
     }
