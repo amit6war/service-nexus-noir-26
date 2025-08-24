@@ -1,59 +1,58 @@
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart, CreditCard, MapPin, CheckCircle, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useShoppingCart } from '@/hooks/useShoppingCart';
-import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import AddressManager, { Address } from '@/components/AddressManager';
+import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { supabase } from '@/integrations/supabase/client';
-import EnhancedCheckoutItem from '@/components/EnhancedCheckoutItem';
+import { useNavigate } from 'react-router-dom';
+import AddressManager from '@/components/AddressManager';
+import { useAuth } from '@/hooks/useAuth';
 
 const Checkout = () => {
-  const { items, getTotalPrice } = useShoppingCart();
-  const navigate = useNavigate();
+  const { items, clearCart, getTotalPrice } = useShoppingCart();
   const { toast } = useToast();
-  
-  const [loading, setLoading] = useState(false);
-  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
 
-  const handleAddressSelect = (address: Address) => {
-    setSelectedAddress(address);
-  };
+  if (!user) {
+    navigate('/auth');
+    return null;
+  }
 
-  const handlePayment = async () => {
-    if (items.length === 0) {
-      toast({
-        title: 'Empty Cart',
-        description: 'Please add services to your cart before checkout.',
-        variant: 'destructive'
-      });
-      return;
-    }
+  if (items.length === 0) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <ShoppingCart className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Your cart is empty</h2>
+          <p className="text-muted-foreground mb-4">Add some services to your cart to proceed with checkout.</p>
+          <Button onClick={() => navigate('/')} className="bg-teal hover:bg-teal/90">
+            Browse Services
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
+  const handleCheckout = async () => {
     if (!selectedAddress) {
       toast({
         title: 'Address Required',
-        description: 'Please select a service address.',
+        description: 'Please select a service address to continue.',
         variant: 'destructive'
       });
       return;
     }
 
-    const itemsWithoutDate = items.filter(item => !item.scheduled_date);
-    if (itemsWithoutDate.length > 0) {
-      toast({
-        title: 'Missing Schedule',
-        description: 'All services must have a scheduled date before checkout.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    setLoading(true);
-
+    setIsProcessing(true);
+    
     try {
       console.log('Creating enhanced Stripe checkout session with complete cart data...');
 
@@ -71,8 +70,6 @@ const Checkout = () => {
         return;
       }
 
-      console.log('User authenticated, proceeding with checkout...');
-
       const addressForCheckout = {
         address_line_1: selectedAddress.address_line_1,
         address_line_2: selectedAddress.address_line_2 || '',
@@ -82,18 +79,17 @@ const Checkout = () => {
         country: selectedAddress.country
       };
 
-      // Store complete cart data in sessionStorage before payment
       const checkoutData = {
         items: items,
         address: addressForCheckout,
         timestamp: Date.now()
       };
-      
-      sessionStorage.setItem('pendingCheckoutItems', JSON.stringify(checkoutData.items));
+
+      // Store checkout data in session storage for post-payment processing
+      sessionStorage.setItem('pendingCheckoutData', JSON.stringify(checkoutData.items));
       sessionStorage.setItem('pendingCheckoutAddress', JSON.stringify(checkoutData.address));
       sessionStorage.setItem('checkoutTimestamp', checkoutData.timestamp.toString());
 
-      console.log('Calling create-checkout function...');
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           items: items,
@@ -122,156 +118,142 @@ const Checkout = () => {
         variant: 'destructive'
       });
     } finally {
-      setLoading(false);
+      setIsProcessing(false);
     }
   };
 
-  const totalPrice = getTotalPrice();
-
-  if (items.length === 0) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center py-12">
-            <ShoppingCart className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Your cart is empty</h2>
-            <p className="text-muted-foreground mb-6">Add some services to get started</p>
-            <Button onClick={() => navigate('/customer-dashboard')} className="bg-teal hover:bg-teal/90">
-              Browse Services
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-4 mb-8">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/customer-dashboard')}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
-            </Button>
-            <h1 className="text-3xl font-bold">Checkout</h1>
-          </div>
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <Button
+        variant="ghost"
+        onClick={() => navigate(-1)}
+        className="mb-6 hover:bg-muted"
+      >
+        <ArrowLeft className="w-4 h-4 mr-2" />
+        Back
+      </Button>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Enhanced Order Summary */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ShoppingCart className="w-5 h-5" />
-                    Order Summary ({items.length} service{items.length !== 1 ? 's' : ''})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {items.map((item) => (
-                    <EnhancedCheckoutItem key={item.id} item={item} />
-                  ))}
-                  
-                  <Separator />
-                  
-                  <div className="flex justify-between items-center text-xl font-bold">
-                    <span>Total:</span>
-                    <span className="text-teal">${totalPrice}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-8"
+      >
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Checkout</h1>
+          <p className="text-muted-foreground">Review your order and complete your booking</p>
+        </div>
 
-            {/* Service Address & Payment */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5" />
-                    Select Service Address
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AddressManager
-                    onAddressSelect={handleAddressSelect}
-                    selectedAddressId={selectedAddress?.id}
-                    showSelection={true}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="w-5 h-5" />
-                    Payment Method
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 border border-border rounded-lg bg-muted/20">
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="w-5 h-5 text-teal" />
-                      <div>
-                        <div className="font-medium">Credit/Debit Card</div>
-                        <div className="text-sm text-muted-foreground">Secure payment via Stripe</div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Order Summary */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5" />
+                  Order Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {items.map((item, index) => (
+                  <div key={index}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-foreground">{item.title}</h3>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="secondary">{item.category}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {item.duration_minutes} minutes
+                          </span>
+                        </div>
+                        {item.provider_profile && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            By {item.provider_profile.business_name}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="font-semibold text-lg">${item.base_price}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{item.price_type}</p>
                       </div>
                     </div>
+                    {index < items.length - 1 && <Separator className="mt-4" />}
                   </div>
+                ))}
+              </CardContent>
+            </Card>
 
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h4 className="font-semibold text-blue-800 mb-2">Test Payment Information</h4>
-                    <div className="text-sm text-blue-700 space-y-1">
-                      <p><strong>Test Card:</strong> 4242 4242 4242 4242</p>
-                      <p><strong>Expiry:</strong> Any future date (e.g., 12/25)</p>
-                      <p><strong>CVV:</strong> Any 3 digits (e.g., 123)</p>
-                      <p><strong>ZIP:</strong> Any 5 digits (e.g., 12345)</p>
-                    </div>
-                  </div>
+            {/* Service Address */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5" />
+                  Service Address
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AddressManager 
+                  onAddressSelect={setSelectedAddress}
+                  selectedAddressId={selectedAddress?.id}
+                />
+              </CardContent>
+            </Card>
+          </div>
 
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-sm text-green-800">
-                      <strong>Secure Payment:</strong> You'll be redirected to Stripe's secure checkout page to complete your payment.
-                    </p>
+          {/* Payment Summary */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5" />
+                  Payment Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal ({items.length} item{items.length !== 1 ? 's' : ''})</span>
+                    <span>${getTotalPrice()}</span>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex justify-between text-sm">
+                    <span>Service Fee</span>
+                    <span>$0.00</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between font-semibold text-lg">
+                    <span>Total</span>
+                    <span>${getTotalPrice()}</span>
+                  </div>
+                </div>
 
-              <Button
-                onClick={handlePayment}
-                disabled={loading || !selectedAddress}
-                className="w-full h-14 text-lg bg-teal hover:bg-teal/90"
-                size="lg"
-              >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
-                    />
-                    Processing Payment...
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5" />
-                    Complete Payment - ${totalPrice}
-                  </div>
-                )}
-              </Button>
-              
-              {!selectedAddress && (
-                <p className="text-sm text-muted-foreground text-center">
-                  Please select a service address to continue
-                </p>
-              )}
-            </div>
+                <Button 
+                  onClick={handleCheckout}
+                  disabled={isProcessing || !selectedAddress}
+                  className="w-full bg-teal hover:bg-teal/90 text-white"
+                  size="lg"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Complete Payment
+                    </>
+                  )}
+                </Button>
+
+                <div className="text-xs text-muted-foreground text-center">
+                  By completing this purchase, you agree to our terms of service.
+                  You will be redirected to Stripe for secure payment processing.
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
