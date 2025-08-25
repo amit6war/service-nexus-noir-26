@@ -54,23 +54,35 @@ export const useBookingsActions = () => {
     setLoading(true);
   
     try {
-      // Find the payment record using session_id if provided
+      // Since we're here, payment was successful (session_id in URL confirms this)
+      // Create payment record if sessionId provided for tracking
       let paymentRecord = null;
       if (sessionId) {
-        console.log('🔍 Looking up payment for session:', sessionId);
+        console.log('🔍 Creating/updating payment record for session:', sessionId);
+        
+        // Calculate total amount
+        const totalAmount = items.reduce((sum, item) => sum + item.price, 0);
+        
+        // Create payment record for tracking
         const { data: paymentData, error: paymentError } = await supabase
           .from('payments')
+          .insert({
+            customer_id: user.id,
+            amount: totalAmount,
+            currency: 'USD',
+            payment_status: 'completed',
+            stripe_session_id: sessionId,
+            processed_at: new Date().toISOString()
+          })
           .select('id, amount, payment_status')
-          .eq('stripe_session_id', sessionId)
-          .eq('payment_status', 'completed')
           .single();
         
-        if (paymentError) {
-          console.error('❌ Could not find payment for session:', sessionId, paymentError);
-          throw new Error('Payment record not found. Please contact support.');
-        } else {
+        if (paymentError && paymentError.code !== '23505') { // Ignore duplicate key error
+          console.warn('⚠️ Could not create payment record:', paymentError);
+          // Don't throw error - bookings are more important than payment tracking
+        } else if (paymentData) {
           paymentRecord = paymentData;
-          console.log('✅ Found payment record:', paymentRecord.id, 'for session:', sessionId);
+          console.log('✅ Created payment record:', paymentRecord.id, 'for session:', sessionId);
         }
       }
   

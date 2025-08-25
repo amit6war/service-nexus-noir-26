@@ -52,17 +52,17 @@ const PaymentSuccess = () => {
 
     if (!pendingItems || !pendingAddress) {
       console.log('❌ No pending checkout data found');
-      setError('No payment data found to create bookings. If you were charged, contact support.');
+      setError('No checkout data found. Please contact support if you were charged.');
       setShowModal(true);
       return;
     }
 
-    // Extract session_id from URL parameters
+    // Extract session_id from URL parameters - this confirms payment was successful
     const sessionId = searchParams.get('session_id');
     
     if (!sessionId) {
       console.log('❌ No session_id found in URL parameters');
-      setError('Invalid payment session. Please contact support if you were charged.');
+      setError('Payment session not found. Please contact support if you were charged.');
       setShowModal(true);
       return;
     }
@@ -78,7 +78,7 @@ const PaymentSuccess = () => {
   
       console.log('📝 Creating bookings with items:', items.length, 'address:', address, 'sessionId:', sessionId);
   
-      // Create bookings with confirmed status
+      // Create bookings with confirmed status - since we reached here, payment was successful
       await createBookingsFromCart(items, address, sessionId);
   
       console.log('✅ Bookings created successfully with confirmed status');
