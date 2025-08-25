@@ -5,6 +5,7 @@ import { useShoppingCart } from '@/hooks/useShoppingCart';
 import { useBookingsActions } from '@/hooks/useBookingsActions';
 import { useToast } from '@/hooks/use-toast';
 import BookingResultModal from './BookingResultModal';
+import PaymentFallbackHandler from './PaymentFallbackHandler';
 import { useAuth } from '@/hooks/useAuth';
 import { formatError } from '@/lib/errorFormatter';
 
@@ -23,6 +24,7 @@ const PaymentSuccess = () => {
   const [error, setError] = useState<string | null>(null);
   const [retryAttempts, setRetryAttempts] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
 
   // Prevent duplicate execution (StrictMode double-mounts + reloads)
   const hasTriggeredRef = useRef(false);
@@ -60,12 +62,30 @@ const PaymentSuccess = () => {
     // Extract session_id from URL parameters - this confirms payment was successful
     const sessionId = searchParams.get('session_id') || new URLSearchParams(window.location.search).get('session_id');
     
+    console.log('🔍 Session ID check:');
+    console.log('  - From searchParams:', searchParams.get('session_id'));
+    console.log('  - From URL directly:', new URLSearchParams(window.location.search).get('session_id'));
+    console.log('  - Final sessionId:', sessionId);
+    console.log('  - Current URL:', window.location.href);
+    
+    // If no session_id, check if we have pending data and user is authenticated
+    // This might be a direct access or browser back button scenario
     if (!sessionId) {
       console.log('❌ No session_id found in URL parameters');
       console.log('   - Search params:', Object.fromEntries(searchParams.entries()));
       console.log('   - Direct URL params:', Object.fromEntries(new URLSearchParams(window.location.search).entries()));
       console.log('   - Full URL:', window.location.href);
-      setError('Payment session not found. Please contact support if you were charged.');
+      
+      // Check if this might be a legitimate post-payment scenario with stored data
+      const checkoutTimestamp = sessionStorage.getItem('checkoutTimestamp');
+      const timeElapsed = Date.now() - (checkoutTimestamp ? parseInt(checkoutTimestamp) : 0);
+      
+      if (checkoutTimestamp && timeElapsed < 10 * 60 * 1000) { // Within 10 minutes
+        console.log('⚠️ Recent checkout detected without session_id. This might be a browser back/forward issue.');
+        setError('Payment session not found. If you just completed a payment, please check your email for confirmation or contact support.');
+      } else {
+        setError('Payment session not found. Please contact support if you were charged.');
+      }
       setShowModal(true);
       return;
     }
@@ -154,7 +174,7 @@ const PaymentSuccess = () => {
 
   // Only proceed when auth is ready and user is known
   useEffect(() => {
-    const sessionId = searchParams.get('session_id');
+    const sessionId = searchParams.get('session_id') || new URLSearchParams(window.location.search).get('session_id');
     const currentUrl = window.location.href;
     const urlParams = new URLSearchParams(window.location.search);
     
@@ -163,30 +183,71 @@ const PaymentSuccess = () => {
     console.log('  - User:', !!user?.id);
     console.log('  - Current URL:', currentUrl);
     console.log('  - URL params:', Object.fromEntries(urlParams.entries()));
-    console.log('  - SessionId from searchParams:', sessionId);
+    console.log('  - SessionId from searchParams:', searchParams.get('session_id'));
     console.log('  - SessionId from direct URL params:', urlParams.get('session_id'));
+    console.log('  - Final sessionId:', sessionId);
     
-    // Try both methods to get session_id
-    const actualSessionId = sessionId || urlParams.get('session_id');
-    
-    if (!authLoading && user?.id && actualSessionId) {
-      console.log('✅ All conditions met, processing payment success');
-      processPaymentSuccess();
-    } else if (!authLoading && !user) {
+    // Special handling for edge cases
+    if (!authLoading && !user) {
       console.log('❌ User not authenticated');
       setError('You are not signed in. Please sign in to view your bookings.');
       setShowModal(true);
-    } else if (!authLoading && user?.id && !actualSessionId) {
-      console.log('❌ No session_id found in URL');
-      setError('No payment session found. Please contact support if you were charged.');
-      setShowModal(true);
+      return;
+    }
+
+    if (!authLoading && user?.id) {
+      if (sessionId) {
+        console.log('✅ All conditions met, processing payment success');
+        processPaymentSuccess();
+      } else {
+        // Check if there's pending checkout data that might indicate a payment flow
+        const pendingItems = sessionStorage.getItem('pendingCheckoutItems');
+        const pendingAddress = sessionStorage.getItem('pendingCheckoutAddress');
+        const checkoutTimestamp = sessionStorage.getItem('checkoutTimestamp');
+        
+        if (pendingItems && pendingAddress && checkoutTimestamp) {
+          const timeElapsed = Date.now() - parseInt(checkoutTimestamp);
+          if (timeElapsed < 30 * 60 * 1000) { // Within 30 minutes
+            console.log('⚠️ Found recent pending data but no session_id - showing fallback handler');
+            setShowFallback(true);
+            return;
+          }
+        }
+        
+        console.log('❌ No session_id and no valid pending data');
+        setError('No payment session found. Please contact support if you were charged.');
+        setShowModal(true);
+      }
     } else {
-      console.log('⏳ Waiting for conditions: authLoading=', authLoading, 'user=', !!user?.id, 'sessionId=', !!actualSessionId);
+      console.log('⏳ Waiting for conditions: authLoading=', authLoading, 'user=', !!user?.id, 'sessionId=', !!sessionId);
     }
   }, [authLoading, user?.id, searchParams]);
 
+  const handleFallbackSuccess = () => {
+    setBookingsCreated(true);
+    setShowFallback(false);
+    setShowModal(true);
+  };
+
+  const handleFallbackError = (error: string) => {
+    setError(error);
+    setShowFallback(false);
+    setShowModal(true);
+  };
+
+  // Show fallback handler if no session_id but pending data exists
+  if (showFallback) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <PaymentFallbackHandler
+          onBookingsCreated={handleFallbackSuccess}
+          onError={handleFallbackError}
+        />
+      </div>
+    );
+  }
   // Show loading state if still processing
-  if ((authLoading || creating) && !showModal) {
+  if ((authLoading || creating) && !showModal && !showFallback) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
