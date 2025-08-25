@@ -199,13 +199,15 @@ export const useBookingsActions = () => {
               updated_at: now
             })
             .eq('id', paymentRecord.id);
-  
+
           if (linkError) {
             console.error('❌ Error linking payment to booking:', linkError);
             console.warn('⚠️ Booking created but payment linkage failed. Manual intervention may be needed.');
           } else {
             console.log('✅ Payment successfully linked to booking');
           }
+        } else if (createdBooking) {
+          console.log('ℹ️ Booking created without payment record linking');
         }
       }
       

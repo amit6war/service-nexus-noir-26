@@ -58,10 +58,13 @@ const PaymentSuccess = () => {
     }
 
     // Extract session_id from URL parameters - this confirms payment was successful
-    const sessionId = searchParams.get('session_id');
+    const sessionId = searchParams.get('session_id') || new URLSearchParams(window.location.search).get('session_id');
     
     if (!sessionId) {
       console.log('❌ No session_id found in URL parameters');
+      console.log('   - Search params:', Object.fromEntries(searchParams.entries()));
+      console.log('   - Direct URL params:', Object.fromEntries(new URLSearchParams(window.location.search).entries()));
+      console.log('   - Full URL:', window.location.href);
       setError('Payment session not found. Please contact support if you were charged.');
       setShowModal(true);
       return;
@@ -152,16 +155,33 @@ const PaymentSuccess = () => {
   // Only proceed when auth is ready and user is known
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
-    console.log('🚀 PaymentSuccess mounted. Auth loading:', authLoading, 'User:', !!user, 'SessionId:', !!sessionId);
+    const currentUrl = window.location.href;
+    const urlParams = new URLSearchParams(window.location.search);
     
-    if (!authLoading && user?.id && sessionId) {
+    console.log('🚀 PaymentSuccess mounted:');
+    console.log('  - Auth loading:', authLoading);
+    console.log('  - User:', !!user?.id);
+    console.log('  - Current URL:', currentUrl);
+    console.log('  - URL params:', Object.fromEntries(urlParams.entries()));
+    console.log('  - SessionId from searchParams:', sessionId);
+    console.log('  - SessionId from direct URL params:', urlParams.get('session_id'));
+    
+    // Try both methods to get session_id
+    const actualSessionId = sessionId || urlParams.get('session_id');
+    
+    if (!authLoading && user?.id && actualSessionId) {
+      console.log('✅ All conditions met, processing payment success');
       processPaymentSuccess();
     } else if (!authLoading && !user) {
+      console.log('❌ User not authenticated');
       setError('You are not signed in. Please sign in to view your bookings.');
       setShowModal(true);
-    } else if (!authLoading && user?.id && !sessionId) {
+    } else if (!authLoading && user?.id && !actualSessionId) {
+      console.log('❌ No session_id found in URL');
       setError('No payment session found. Please contact support if you were charged.');
       setShowModal(true);
+    } else {
+      console.log('⏳ Waiting for conditions: authLoading=', authLoading, 'user=', !!user?.id, 'sessionId=', !!actualSessionId);
     }
   }, [authLoading, user?.id, searchParams]);
 
