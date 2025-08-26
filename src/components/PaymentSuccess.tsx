@@ -60,12 +60,10 @@ const PaymentSuccess = () => {
     }
 
     // Extract session_id from URL parameters - this confirms payment was successful
-    const sessionId = searchParams.get('session_id') || new URLSearchParams(window.location.search).get('session_id');
+    const sessionId = new URLSearchParams(window.location.search).get('session_id');
     
     console.log('🔍 Session ID check:');
-    console.log('  - From searchParams:', searchParams.get('session_id'));
-    console.log('  - From URL directly:', new URLSearchParams(window.location.search).get('session_id'));
-    console.log('  - Final sessionId:', sessionId);
+    console.log('  - SessionId:', sessionId);
     console.log('  - Current URL:', window.location.href);
     console.log('  - Parsed URL search params:', Object.fromEntries(new URLSearchParams(window.location.search).entries()));
     
@@ -174,26 +172,18 @@ const PaymentSuccess = () => {
     navigate('/customer-dashboard');
   };
 
-  // Only proceed when auth is ready and user is known
+    // Only proceed when auth is ready and user is known
   useEffect(() => {
-    const sessionId = searchParams.get('session_id') || new URLSearchParams(window.location.search).get('session_id');
-    const currentUrl = window.location.href;
     const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    const currentUrl = window.location.href;
     
     console.log('🚀 PaymentSuccess mounted:');
     console.log('  - Auth loading:', authLoading);
     console.log('  - User:', !!user?.id);
     console.log('  - Current URL:', currentUrl);
     console.log('  - URL params:', Object.fromEntries(urlParams.entries()));
-    console.log('  - SessionId from searchParams:', searchParams.get('session_id'));
-    console.log('  - SessionId from direct URL params:', urlParams.get('session_id'));
-    console.log('  - Final sessionId:', sessionId);
-    
-    // FOR TESTING: If there's a test_session_id, use it as sessionId
-    const testSessionId = urlParams.get('test_session_id');
-    const finalSessionId = sessionId || testSessionId;
-    console.log('  - Test session ID:', testSessionId);
-    console.log('  - Final session ID (including test):', finalSessionId);
+    console.log('  - SessionId:', sessionId);
     
     // Special handling for edge cases
     if (!authLoading && !user) {
@@ -204,12 +194,8 @@ const PaymentSuccess = () => {
     }
 
     if (!authLoading && user?.id) {
-      if (finalSessionId) {
-        console.log('✅ All conditions met, processing payment success with session_id:', finalSessionId);
-        // Update searchParams if using test session
-        if (testSessionId && !sessionId) {
-          console.log('📝 Using test session ID for development');
-        }
+      if (sessionId) {
+        console.log('✅ All conditions met, processing payment success with session_id:', sessionId);
         processPaymentSuccess();
       } else {
         console.log('❌ No session_id found, checking for pending data...');
@@ -245,7 +231,7 @@ const PaymentSuccess = () => {
     } else {
       console.log('⏳ Waiting for conditions: authLoading=', authLoading, 'user=', !!user?.id, 'sessionId=', !!sessionId);
     }
-  }, [authLoading, user?.id, searchParams]);
+  }, [authLoading, user?.id]);
 
   const handleFallbackSuccess = () => {
     setBookingsCreated(true);
