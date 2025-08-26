@@ -67,24 +67,26 @@ const PaymentSuccess = () => {
     console.log('  - From URL directly:', new URLSearchParams(window.location.search).get('session_id'));
     console.log('  - Final sessionId:', sessionId);
     console.log('  - Current URL:', window.location.href);
+    console.log('  - Parsed URL search params:', Object.fromEntries(new URLSearchParams(window.location.search).entries()));
     
-    // If no session_id, check if we have pending data and user is authenticated
-    // This might be a direct access or browser back button scenario
+    // CRITICAL: If no session_id found, this might not be a legitimate payment success
+    // Only proceed without session_id in very specific fallback scenarios
     if (!sessionId) {
       console.log('❌ No session_id found in URL parameters');
-      console.log('   - Search params:', Object.fromEntries(searchParams.entries()));
-      console.log('   - Direct URL params:', Object.fromEntries(new URLSearchParams(window.location.search).entries()));
-      console.log('   - Full URL:', window.location.href);
+      console.log('   - This suggests the user reached this page without completing Stripe checkout');
+      console.log('   - OR there was a technical issue with the redirect');
       
-      // Check if this might be a legitimate post-payment scenario with stored data
+      // Check if this is a recent checkout attempt
       const checkoutTimestamp = sessionStorage.getItem('checkoutTimestamp');
-      const timeElapsed = Date.now() - (checkoutTimestamp ? parseInt(checkoutTimestamp) : 0);
+      const timeElapsed = checkoutTimestamp ? Date.now() - parseInt(checkoutTimestamp) : Infinity;
       
-      if (checkoutTimestamp && timeElapsed < 10 * 60 * 1000) { // Within 10 minutes
-        console.log('⚠️ Recent checkout detected without session_id. This might be a browser back/forward issue.');
-        setError('Payment session not found. If you just completed a payment, please check your email for confirmation or contact support.');
+      if (checkoutTimestamp && timeElapsed < 5 * 60 * 1000) { // Within 5 minutes
+        console.log('⚠️ Recent checkout detected without session_id - possible technical issue');
+        console.log('   Time elapsed since checkout:', timeElapsed / 1000, 'seconds');
+        setError('Payment verification failed. This might be due to a technical issue. Please try the fallback option or contact support if you were charged.');
       } else {
-        setError('Payment session not found. Please contact support if you were charged.');
+        console.log('❌ No recent checkout or session expired');
+        setError('No payment session found. Please contact support if you were charged.');
       }
       setShowModal(true);
       return;
@@ -187,6 +189,12 @@ const PaymentSuccess = () => {
     console.log('  - SessionId from direct URL params:', urlParams.get('session_id'));
     console.log('  - Final sessionId:', sessionId);
     
+    // FOR TESTING: If there's a test_session_id, use it as sessionId
+    const testSessionId = urlParams.get('test_session_id');
+    const finalSessionId = sessionId || testSessionId;
+    console.log('  - Test session ID:', testSessionId);
+    console.log('  - Final session ID (including test):', finalSessionId);
+    
     // Special handling for edge cases
     if (!authLoading && !user) {
       console.log('❌ User not authenticated');
@@ -196,25 +204,41 @@ const PaymentSuccess = () => {
     }
 
     if (!authLoading && user?.id) {
-      if (sessionId) {
-        console.log('✅ All conditions met, processing payment success');
+      if (finalSessionId) {
+        console.log('✅ All conditions met, processing payment success with session_id:', finalSessionId);
+        // Update searchParams if using test session
+        if (testSessionId && !sessionId) {
+          console.log('📝 Using test session ID for development');
+        }
         processPaymentSuccess();
       } else {
+        console.log('❌ No session_id found, checking for pending data...');
+        
         // Check if there's pending checkout data that might indicate a payment flow
         const pendingItems = sessionStorage.getItem('pendingCheckoutItems');
         const pendingAddress = sessionStorage.getItem('pendingCheckoutAddress');
         const checkoutTimestamp = sessionStorage.getItem('checkoutTimestamp');
         
+        console.log('📦 Pending data check:');
+        console.log('  - pendingItems:', !!pendingItems);
+        console.log('  - pendingAddress:', !!pendingAddress);
+        console.log('  - checkoutTimestamp:', checkoutTimestamp);
+        
         if (pendingItems && pendingAddress && checkoutTimestamp) {
           const timeElapsed = Date.now() - parseInt(checkoutTimestamp);
+          console.log('⏰ Time elapsed since checkout:', timeElapsed / 1000 / 60, 'minutes');
+          
           if (timeElapsed < 30 * 60 * 1000) { // Within 30 minutes
-            console.log('⚠️ Found recent pending data but no session_id - showing fallback handler');
+            console.log('⚠️ Found recent pending data but no session_id - this suggests a technical issue');
+            console.log('   Showing fallback handler to allow manual booking creation');
             setShowFallback(true);
             return;
+          } else {
+            console.log('⏰ Pending data is too old (>30 minutes), ignoring');
           }
         }
         
-        console.log('❌ No session_id and no valid pending data');
+        console.log('❌ No session_id and no valid pending data - likely invalid access');
         setError('No payment session found. Please contact support if you were charged.');
         setShowModal(true);
       }
