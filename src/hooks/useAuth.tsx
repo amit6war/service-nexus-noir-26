@@ -37,6 +37,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const [profileRole, setProfileRole] = useState<AppRole | null>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isSigningOutRef = useRef(false);
 
   console.log('[Auth] Current state:', { user: user?.id, session: session?.access_token ? 'exists' : 'none', loading, profileRole });
 
@@ -93,7 +94,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       clearTimeout(inactivityTimerRef.current);
     }
     
-    if (user) {
+    if (user && !isSigningOutRef.current) {
       inactivityTimerRef.current = setTimeout(() => {
         handleAutoLogout();
       }, 30 * 60 * 1000); // 30 minutes
@@ -102,7 +103,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Track user activity
   useEffect(() => {
-    if (!user) return;
+    if (!user || isSigningOutRef.current) return;
 
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
     
@@ -136,14 +137,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         console.log('[Auth] Auth state changed:', event, session?.user?.id);
         
+        // Handle sign out event
+        if (event === 'SIGNED_OUT') {
+          console.log('[Auth] Handling sign out event');
+          setSession(null);
+          setUser(null);
+          setProfileRole(null);
+          if (inactivityTimerRef.current) {
+            clearTimeout(inactivityTimerRef.current);
+            inactivityTimerRef.current = null;
+          }
+          setLoading(false);
+          return;
+        }
+        
         setSession(session);
         const nextUser = session?.user ?? null;
         setUser(nextUser);
         
         // Load the role from profiles when auth state changes
-        if (nextUser && session) {
+        if (nextUser && session && !isSigningOutRef.current) {
           setTimeout(() => {
-            if (mounted) {
+            if (mounted && !isSigningOutRef.current) {
               loadProfileRole(nextUser.id);
             }
           }, 0);
@@ -172,14 +187,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
         console.log('[Auth] Initial session check:', session?.user?.id);
         
-        if (mounted) {
+        if (mounted && !isSigningOutRef.current) {
           setSession(session);
           const nextUser = session?.user ?? null;
           setUser(nextUser);
           
           if (nextUser && session) {
             setTimeout(() => {
-              if (mounted) {
+              if (mounted && !isSigningOutRef.current) {
                 loadProfileRole(nextUser.id);
               }
             }, 0);
@@ -279,18 +294,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const signOut = async () => {
     console.log('[Auth] Starting signout process');
     
+    // Prevent multiple simultaneous signouts
+    if (isSigningOutRef.current) {
+      console.log('[Auth] Signout already in progress');
+      return { error: null };
+    }
+    
     try {
-      // Clear inactivity timer
+      isSigningOutRef.current = true;
+      
+      // Clear inactivity timer immediately
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
         inactivityTimerRef.current = null;
       }
       
-      // Clear local state immediately
-      setUser(null);
-      setSession(null);
-      setProfileRole(null);
-      
+      console.log('[Auth] Calling Supabase signOut');
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -300,18 +319,32 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           description: error.message,
           variant: "destructive",
         });
+        isSigningOutRef.current = false;
         return { error };
       }
       
       console.log('[Auth] Signout successful');
       
-      // Force reload to clear all state and redirect to home
+      // Clear all state
+      setUser(null);
+      setSession(null);
+      setProfileRole(null);
+      setLoading(false);
+      
+      // Navigate to home page
       window.location.href = '/';
       
       return { error: null };
     } catch (error) {
       console.error('[Auth] Signout exception:', error);
-      // Force reload even on error to clear state
+      isSigningOutRef.current = false;
+      
+      // Clear state anyway
+      setUser(null);
+      setSession(null);
+      setProfileRole(null);
+      
+      // Navigate to home even on error
       window.location.href = '/';
       return { error };
     }
