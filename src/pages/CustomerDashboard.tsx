@@ -14,6 +14,7 @@ import CartSection from '@/components/CartSection';
 import ProfileSettings from '@/components/ProfileSettings';
 import MyBookings from '@/components/MyBookings';
 import AmountSection from '@/components/AmountSection';
+import FavoritesSection from '@/components/FavoritesSection';
 
 const CustomerDashboard = () => {
   const [activeTab, setActiveTab] = useState('services');
@@ -375,13 +376,9 @@ const CustomerDashboard = () => {
               <AmountSection />
             )}
 
+            {/* Favorites Section */}
             {activeTab === 'favorites' && (
-              <div className="space-y-6">
-                <h1 className="text-3xl font-bold text-foreground">Favorites</h1>
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground">No favorites yet. Browse services and save your preferred providers!</p>
-                </div>
-              </div>
+              <FavoritesSection />
             )}
 
             {activeTab === 'profile' && (
