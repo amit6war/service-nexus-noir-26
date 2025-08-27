@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { Calendar, Clock, AlertCircle } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -17,58 +17,52 @@ interface RescheduleModalProps {
   children: React.ReactNode;
 }
 
-const RescheduleModal: React.FC<RescheduleModalProps> = ({
-  bookingId,
-  currentDate,
-  currentTime,
-  onRescheduleSuccess,
-  children
-}) => {
-  const [newDate, setNewDate] = useState('');
-  const [newTime, setNewTime] = useState('');
-  const [reason, setReason] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+const RescheduleModal = ({ bookingId, currentDate, currentTime, onRescheduleSuccess, children }: RescheduleModalProps) => {
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date(currentDate));
+  const [selectedTime, setSelectedTime] = useState(currentTime);
   const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  const timeSlots = [
+    '08:00', '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'
+  ];
+
   const handleReschedule = async () => {
-    if (!newDate || !newTime) {
+    if (!selectedDate || !selectedTime) {
       toast({
         title: 'Missing Information',
-        description: 'Please select both a new date and time.',
+        description: 'Please select both date and time.',
         variant: 'destructive'
       });
       return;
     }
 
-    setIsLoading(true);
-    
     try {
-      const newDateTime = new Date(`${newDate}T${newTime}`);
+      setLoading(true);
       
+      // Create new service date
+      const newServiceDate = new Date(selectedDate);
+      const [hours, minutes] = selectedTime.split(':').map(Number);
+      newServiceDate.setHours(hours, minutes, 0, 0);
+
       const { error } = await supabase
         .from('bookings')
         .update({
-          scheduled_date: newDateTime.toISOString(),
-          status: 'confirmed', // Reset to confirmed after reschedule
-          reschedule_reason: reason || 'Customer requested reschedule',
+          service_date: newServiceDate.toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', bookingId);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       toast({
         title: 'Booking Rescheduled',
-        description: 'Your booking has been successfully rescheduled.',
+        description: `Your booking has been rescheduled to ${format(newServiceDate, 'MMM dd, yyyy')} at ${selectedTime}.`,
       });
 
       setIsOpen(false);
-      setNewDate('');
-      setNewTime('');
-      setReason('');
       onRescheduleSuccess();
     } catch (error) {
       console.error('Error rescheduling booking:', error);
@@ -78,7 +72,7 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({
         variant: 'destructive'
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -87,80 +81,51 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Reschedule Booking
-          </DialogTitle>
+          <DialogTitle>Reschedule Booking</DialogTitle>
           <DialogDescription>
-            Current booking: {format(new Date(currentDate), 'MMM dd, yyyy')} at {currentTime}
+            Select a new date and time for your service appointment.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-date">New Date</Label>
-              <input
-                id="new-date"
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                min={format(new Date(), 'yyyy-MM-dd')}
-                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-teal"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="new-time">New Time</Label>
-              <input
-                id="new-time"
-                type="time"
-                value={newTime}
-                onChange={(e) => setNewTime(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-teal"
-              />
-            </div>
+        <div className="space-y-6 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Select Date</label>
+            <CalendarComponent
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              disabled={(date) => date < new Date() || date < new Date(Date.now() + 24 * 60 * 60 * 1000)}
+              className="rounded-md border"
+            />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="reason">Reason for Reschedule (Optional)</Label>
-            <Textarea
-              id="reason"
-              placeholder="Let the provider know why you're rescheduling..."
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-yellow-800">
-              <p className="font-medium">Please note:</p>
-              <p>The provider will be notified of this reschedule request and may need to confirm the new time.</p>
-            </div>
+            <label className="text-sm font-medium">Select Time</label>
+            <Select value={selectedTime} onValueChange={setSelectedTime}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select time" />
+              </SelectTrigger>
+              <SelectContent>
+                {timeSlots.map((time) => (
+                  <SelectItem key={time} value={time}>
+                    {time}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
-        
-        <div className="flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setIsOpen(false)}
-            disabled={isLoading}
-          >
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsOpen(false)}>
             Cancel
           </Button>
-          <Button
-            onClick={handleReschedule}
-            disabled={isLoading}
-            className="bg-teal hover:bg-teal/90"
-          >
-            <Clock className="w-4 h-4 mr-2" />
-            {isLoading ? 'Rescheduling...' : 'Reschedule'}
+          <Button onClick={handleReschedule} disabled={loading}>
+            {loading ? 'Rescheduling...' : 'Reschedule Booking'}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

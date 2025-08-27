@@ -18,11 +18,10 @@ interface Provider {
   hourly_rate: number;
   rating: number;
   total_reviews: number;
-  location: string;
-  phone: string;
-  email: string;
-  profile_image_url?: string;
-  verified: boolean;
+  business_address: string;
+  business_phone: string;
+  business_email: string;
+  verification_status: string;
 }
 
 const FavoritesSection = () => {
@@ -47,7 +46,7 @@ const FavoritesSection = () => {
       const providerUserIds = favorites.map(fav => fav.provider_user_id);
       
       const { data: providers, error } = await supabase
-        .from('service_providers')
+        .from('provider_profiles')
         .select('*')
         .in('user_id', providerUserIds);
 
@@ -74,10 +73,10 @@ const FavoritesSection = () => {
   };
 
   const handleContactProvider = (provider: Provider) => {
-    if (provider.phone) {
-      window.open(`tel:${provider.phone}`, '_self');
-    } else if (provider.email) {
-      window.open(`mailto:${provider.email}`, '_self');
+    if (provider.business_phone) {
+      window.open(`tel:${provider.business_phone}`, '_self');
+    } else if (provider.business_email) {
+      window.open(`mailto:${provider.business_email}`, '_self');
     }
   };
 
@@ -119,16 +118,8 @@ const FavoritesSection = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-teal/20 rounded-full flex items-center justify-center relative">
-                        {provider.profile_image_url ? (
-                          <img
-                            src={provider.profile_image_url}
-                            alt={provider.business_name}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          <User className="w-6 h-6 text-teal" />
-                        )}
-                        {provider.verified && (
+                        <User className="w-6 h-6 text-teal" />
+                        {provider.verification_status === 'approved' && (
                           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-teal rounded-full flex items-center justify-center">
                             <Star className="w-2.5 h-2.5 text-white fill-current" />
                           </div>
@@ -164,7 +155,7 @@ const FavoritesSection = () => {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
-                        <span className="truncate">{provider.location}</span>
+                        <span className="truncate">{provider.business_address}</span>
                       </div>
                     </div>
 
@@ -172,7 +163,7 @@ const FavoritesSection = () => {
                       <div className="text-lg font-bold text-teal">
                         ${provider.hourly_rate}/hr
                       </div>
-                      {provider.verified && (
+                      {provider.verification_status === 'approved' && (
                         <Badge className="bg-teal text-white">Verified</Badge>
                       )}
                     </div>

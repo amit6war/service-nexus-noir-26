@@ -12,25 +12,28 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import BookingStatusBadge from './BookingStatusBadge';
 import RescheduleModal from './RescheduleModal';
+import type { Database } from '@/integrations/supabase/types';
+
+type BookingStatus = Database['public']['Enums']['booking_status'];
 
 interface Booking {
   id: string;
   booking_number: string;
-  status: string;
-  scheduled_date: string;
-  total_amount: number;
+  status: BookingStatus;
+  service_date: string;
+  final_price: number;
   special_instructions?: string;
   created_at: string;
   services: {
     title: string;
     duration_minutes: number;
-  };
-  service_providers: {
+  } | null;
+  provider_profiles: {
     business_name: string;
-    phone?: string;
+    business_phone?: string;
     rating?: number;
     total_reviews?: number;
-  };
+  } | null;
 }
 
 const MyBookings = () => {
@@ -82,23 +85,23 @@ const MyBookings = () => {
           id,
           booking_number,
           status,
-          scheduled_date,
-          total_amount,
+          service_date,
+          final_price,
           special_instructions,
           created_at,
           services (
             title,
             duration_minutes
           ),
-          service_providers (
+          provider_profiles!provider_user_id (
             business_name,
-            phone,
+            business_phone,
             rating,
             total_reviews
           )
         `)
         .eq('customer_id', user.id)
-        .order('scheduled_date', { ascending: false });
+        .order('service_date', { ascending: false });
 
       if (error) {
         throw error;
@@ -122,7 +125,7 @@ const MyBookings = () => {
       const { error } = await supabase
         .from('bookings')
         .update({
-          status: 'cancelled',
+          status: 'cancelled' as BookingStatus,
           cancelled_at: new Date().toISOString(),
           cancellation_reason: 'Customer cancellation'
         })
@@ -146,16 +149,16 @@ const MyBookings = () => {
     }
   };
 
-  const canReschedule = (status: string, scheduledDate: string) => {
-    const bookingDate = new Date(scheduledDate);
+  const canReschedule = (status: BookingStatus, serviceDate: string) => {
+    const bookingDate = new Date(serviceDate);
     const now = new Date();
     const hoursUntilBooking = (bookingDate.getTime() - now.getTime()) / (1000 * 60 * 60);
     
     return ['confirmed', 'accepted'].includes(status) && hoursUntilBooking > 24;
   };
 
-  const canCancel = (status: string, scheduledDate: string) => {
-    const bookingDate = new Date(scheduledDate);
+  const canCancel = (status: BookingStatus, serviceDate: string) => {
+    const bookingDate = new Date(serviceDate);
     const now = new Date();
     const hoursUntilBooking = (bookingDate.getTime() - now.getTime()) / (1000 * 60 * 60);
     
@@ -168,12 +171,12 @@ const MyBookings = () => {
     switch (filterType) {
       case 'upcoming':
         return bookings.filter(booking => {
-          const bookingDate = new Date(booking.scheduled_date);
+          const bookingDate = new Date(booking.service_date);
           return bookingDate > now && !['cancelled', 'completed'].includes(booking.status);
         });
       case 'past':
         return bookings.filter(booking => {
-          const bookingDate = new Date(booking.scheduled_date);
+          const bookingDate = new Date(booking.service_date);
           return bookingDate < now || ['completed', 'cancelled'].includes(booking.status);
         });
       case 'cancelled':
@@ -204,7 +207,7 @@ const MyBookings = () => {
             </div>
             <div className="text-right">
               <div className="text-lg font-bold text-teal">
-                ${booking.total_amount?.toFixed(2)}
+                ${booking.final_price?.toFixed(2)}
               </div>
             </div>
           </div>
@@ -216,12 +219,12 @@ const MyBookings = () => {
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span>{format(new Date(booking.scheduled_date), 'MMM dd, yyyy')}</span>
+                  <span>{format(new Date(booking.service_date), 'MMM dd, yyyy')}</span>
                 </div>
                 
                 <div className="flex items-center gap-2 text-sm">
                   <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span>{format(new Date(booking.scheduled_date), 'h:mm a')}</span>
+                  <span>{format(new Date(booking.service_date), 'h:mm a')}</span>
                   <span className="text-muted-foreground">
                     ({booking.services?.duration_minutes} min)
                   </span>
@@ -231,15 +234,15 @@ const MyBookings = () => {
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm">
                   <User className="w-4 h-4 text-muted-foreground" />
-                  <span>{booking.service_providers?.business_name || 'Provider'}</span>
+                  <span>{booking.provider_profiles?.business_name || 'Provider'}</span>
                 </div>
                 
-                {booking.service_providers?.rating && (
+                {booking.provider_profiles?.rating && (
                   <div className="flex items-center gap-2 text-sm">
                     <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                    <span>{booking.service_providers.rating}</span>
+                    <span>{booking.provider_profiles.rating}</span>
                     <span className="text-muted-foreground">
-                      ({booking.service_providers.total_reviews || 0}+ reviews)
+                      ({booking.provider_profiles.total_reviews || 0}+ reviews)
                     </span>
                   </div>
                 )}
@@ -254,11 +257,11 @@ const MyBookings = () => {
             )}
             
             <div className="flex gap-2 pt-2">
-              {canReschedule(booking.status, booking.scheduled_date) && (
+              {canReschedule(booking.status, booking.service_date) && (
                 <RescheduleModal
                   bookingId={booking.id}
-                  currentDate={booking.scheduled_date}
-                  currentTime={format(new Date(booking.scheduled_date), 'HH:mm')}
+                  currentDate={booking.service_date}
+                  currentTime={format(new Date(booking.service_date), 'HH:mm')}
                   onRescheduleSuccess={loadBookings}
                 >
                   <Button variant="outline" size="sm">
@@ -268,7 +271,7 @@ const MyBookings = () => {
                 </RescheduleModal>
               )}
               
-              {canCancel(booking.status, booking.scheduled_date) && (
+              {canCancel(booking.status, booking.service_date) && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -280,11 +283,11 @@ const MyBookings = () => {
                 </Button>
               )}
               
-              {booking.service_providers?.phone && (
+              {booking.provider_profiles?.business_phone && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(`tel:${booking.service_providers.phone}`, '_self')}
+                  onClick={() => window.open(`tel:${booking.provider_profiles?.business_phone}`, '_self')}
                 >
                   <Phone className="w-4 h-4 mr-2" />
                   Call Provider
