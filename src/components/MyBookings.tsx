@@ -92,7 +92,7 @@ const MyBookings = () => {
             title,
             duration_minutes
           ),
-          provider_profiles!bookings_provider_user_id_fkey (
+          provider_profiles (
             business_name,
             business_phone,
             rating,
