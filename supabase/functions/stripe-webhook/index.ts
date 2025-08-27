@@ -1,10 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
-
-// Remove static Redis import; we'll dynamic import when needed
-const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
-const REDIS_URL = Deno.env.get("REDIS_URL") || "";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,186 +12,153 @@ const log = (msg: string, ctx?: Record<string, unknown>) => {
   console.log(`[stripe-webhook] ${msg}`, ctx ?? {});
 };
 
-function parseRedisUrl(url: string) {
-  try {
-    const u = new URL(url);
-    const isTls = u.protocol === "rediss:";
-    const hostname = u.hostname;
-    const port = Number(u.port || (isTls ? 6380 : 6379));
-    const password = u.password || undefined;
-    return { hostname, port, password, tls: isTls };
-  } catch {
-    return null;
-  }
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const signature = req.headers.get("stripe-signature") || "";
+  const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY") || "";
+  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
+  if (!stripeSecret || !webhookSecret) {
+    log("Missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET");
+    return new Response(JSON.stringify({ error: "Server misconfiguration" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
 
+  const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
+  const signature = req.headers.get("stripe-signature") ?? "";
+
+  let event: Stripe.Event;
+  try {
+    const payload = await req.text();
+    event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+  } catch (err) {
+    log("Webhook signature verification failed", { error: err instanceof Error ? err.message : String(err) });
+    return new Response(JSON.stringify({ error: "Invalid signature" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400,
+    });
+  }
+
+  const supabaseService = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    { auth: { persistSession: false } }
+  );
 
   try {
-    const bodyText = await req.text();
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2023-10-16" });
-    const event = stripe.webhooks.constructEvent(bodyText, signature, STRIPE_WEBHOOK_SECRET);
+    log("Event received", { type: event.type, id: event.id });
 
-    // Enqueue to Redis for async processing (if configured and available)
-    if (REDIS_URL) {
-      const cfg = parseRedisUrl(REDIS_URL);
-      if (cfg) {
-
-    if (!signature) {
-      throw new Error("No signature provided");
-    }
-
-    // Verify the webhook signature (in production, you'd set up a webhook endpoint secret)
-    let event;
-    try {
-      // For now, we'll parse the event directly since we're in test mode
-      event = JSON.parse(body);
-      logStep("Event type received", { type: event.type, id: event.id });
-    } catch (err) {
-      console.error("Error parsing webhook:", err);
-      throw new Error("Invalid webhook payload");
-    }
-
-    // Create Supabase client with service role key to bypass RLS
-    const supabaseService = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
-
-    // Handle successful payment
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
-      logStep("Processing successful payment for session", { sessionId: session.id });
+      const session = event.data.object as Stripe.Checkout.Session;
+      const paymentIntentId = typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : session.payment_intent?.id;
 
-      // Extract metadata
-      const userId = session.metadata?.user_id;
-      const paymentIntentId = session.payment_intent;
-      const amountPaid = session.amount_total / 100; // Convert from cents
-
-      if (!userId) {
-        logStep("Missing user_id in session metadata");
-        return new Response("Missing user_id", { status: 400 });
+      // 1) Upsert into new payment_intents table for reconciliation
+      if (paymentIntentId) {
+        await supabaseService
+          .from("payment_intents")
+          .upsert({
+            stripe_payment_intent_id: paymentIntentId,
+            amount: typeof session.amount_total === "number" ? session.amount_total : 0,
+            currency: (session.currency || "usd").toUpperCase(),
+            status: "succeeded",
+            user_id: (session.metadata?.user_id as string) || null,
+            metadata: session.metadata || {},
+          }, { onConflict: "stripe_payment_intent_id" });
       }
 
-      logStep("Payment details", { 
-        userId, 
-        paymentIntentId, 
-        amountPaid, 
-        currency: session.currency 
-      });
+      // 2) Idempotent write to existing payments table used by current UI flow
+      const { data: existing } = await supabaseService
+        .from("payments")
+        .select("id")
+        .eq("stripe_session_id", session.id)
+        .maybeSingle();
 
-      // Record the payment first
-      const { data: paymentData, error: paymentError } = await supabaseService
-        .from('payments')
-        .insert({
-          customer_id: userId,
-          amount: amountPaid,
-          currency: session.currency?.toUpperCase() || 'USD',
-          payment_status: 'completed',
-          stripe_charge_id: paymentIntentId,
+      if (!existing) {
+        await supabaseService.from("payments").insert({
+          customer_id: (session.metadata?.user_id as string) || null,
+          amount: typeof session.amount_total === "number" ? session.amount_total / 100 : 0,
+          currency: (session.currency || "USD").toUpperCase(),
+          payment_status: "completed",
+          stripe_charge_id: paymentIntentId || null,
+          payment_intent_id: paymentIntentId || null,
+          payment_method: "stripe_checkout",
           stripe_session_id: session.id,
-          payment_method: 'stripe_checkout',
           processed_at: new Date().toISOString(),
-          payment_intent_id: paymentIntentId,
-          // booking_id will be set later by the frontend
-        })
-        .select('id')
-        .single();
-
-      if (paymentError) {
-        logStep("Error recording payment", { error: paymentError });
-        
-        // Create automatic refund if payment recording fails
-
-        try {
-          const mod = await import("https://deno.land/x/redis@v0.36.0/mod.ts");
-          const connect = (mod as any).connect as (opts: any) => Promise<any>;
-          const redis = await connect({
-            hostname: cfg.hostname,
-            port: cfg.port,
-            password: cfg.password,
-            tls: cfg.tls ? {} : undefined,
-          });
-          try {
-            await redis.lpush("queue:webhooks", JSON.stringify(event));
-          } finally {
-            try { redis?.close?.(); } catch {}
-          }
-        } catch (e) {
-          console.log("[stripe-webhook] Redis enqueue failed, continuing without queue", { error: e instanceof Error ? e.message : String(e) });
-        }
-
-        
-        return new Response(JSON.stringify({ 
-          error: "Failed to record payment",
-          refund_initiated: !!paymentIntentId
-        }), { status: 500 });
-      }
-
-      logStep("Payment recorded successfully - awaiting booking linkage", { 
-        paymentId: paymentData.id,
-        sessionId: session.id 
-      });
-
-      // The actual booking creation will be handled by the frontend PaymentSuccess component
-      // This webhook just ensures the payment is properly recorded
-
-    } else if (event.type === "payment_intent.payment_failed") {
-      const paymentIntent = event.data.object;
-      logStep("Payment failed", { paymentIntentId: paymentIntent.id });
-
-      // Record the failed payment
-      const { error: failedPaymentError } = await supabaseService
-        .from('payments')
-        .insert({
-          customer_id: paymentIntent.metadata?.user_id || null,
-          amount: paymentIntent.amount / 100,
-          currency: paymentIntent.currency?.toUpperCase() || 'USD',
-          payment_status: 'failed',
-          payment_intent_id: paymentIntent.id,
-          payment_method: 'stripe_checkout',
-          processed_at: new Date().toISOString()
         });
-
-      if (failedPaymentError) {
-        logStep("Error recording failed payment", { error: failedPaymentError });
+      } else {
+        await supabaseService
+          .from("payments")
+          .update({
+            payment_status: "completed",
+            processed_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
       }
+    }
 
-    } else if (event.type === "charge.dispute.created") {
-      const dispute = event.data.object;
-      logStep("Dispute created", { disputeId: dispute.id, chargeId: dispute.charge });
+    if (event.type === "payment_intent.payment_failed") {
+      const pi = event.data.object as Stripe.PaymentIntent;
 
-      // Handle dispute by updating payment status
-      const { error: disputeError } = await supabaseService
-        .from('payments')
-        .update({ 
-          payment_status: 'disputed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('stripe_charge_id', dispute.charge);
+      // Update new payment_intents table
+      await supabaseService
+        .from("payment_intents")
+        .upsert({
+          stripe_payment_intent_id: pi.id,
+          amount: typeof pi.amount === "number" ? pi.amount : 0,
+          currency: (pi.currency || "usd").toUpperCase(),
+          status: "failed",
+          user_id: (pi.metadata?.user_id as string) || null,
+          metadata: pi.metadata || {},
+        }, { onConflict: "stripe_payment_intent_id" });
 
-      if (disputeError) {
-        logStep("Error updating payment for dispute", { error: disputeError });
+      // Record failure in existing payments table (idempotent-ish)
+      const { data: maybePay } = await supabaseService
+        .from("payments")
+        .select("id")
+        .eq("payment_intent_id", pi.id)
+        .maybeSingle();
 
+      if (!maybePay) {
+        await supabaseService.from("payments").insert({
+          customer_id: (pi.metadata?.user_id as string) || null,
+          amount: typeof pi.amount === "number" ? pi.amount / 100 : 0,
+          currency: (pi.currency || "USD").toUpperCase(),
+          payment_status: "failed",
+          payment_intent_id: pi.id,
+          payment_method: "stripe_checkout",
+          processed_at: new Date().toISOString(),
+        });
+      } else {
+        await supabaseService
+          .from("payments")
+          .update({ payment_status: "failed" })
+          .eq("id", maybePay.id);
       }
+    }
+
+    if (event.type === "charge.dispute.created") {
+      const dispute = event.data.object as Stripe.Dispute;
+      // Mark payment as disputed by charge id
+      await supabaseService
+        .from("payments")
+        .update({ payment_status: "disputed", updated_at: new Date().toISOString() } as any)
+        .eq("stripe_charge_id", dispute.charge as string);
     }
 
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-  } catch (err) {
-    log("Webhook signature validation failed", { error: err instanceof Error ? err.message : String(err) });
-    return new Response(JSON.stringify({ error: "Invalid signature" }), {
+  } catch (e) {
+    log("Unhandled webhook error", { error: e instanceof Error ? e.message : String(e) });
+    return new Response(JSON.stringify({ error: "Internal error" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
+      status: 500,
     });
   }
 });
