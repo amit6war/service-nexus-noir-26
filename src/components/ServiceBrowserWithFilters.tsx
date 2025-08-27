@@ -55,7 +55,15 @@ const ServiceBrowserWithFilters = () => {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.2 }}
     >
-      <ServiceCard service={service} />
+      <ServiceCard 
+        icon="🔧"
+        title={service.title}
+        provider={service.provider_profile?.business_name || 'Unknown Provider'}
+        rating={service.provider_profile?.rating || 0}
+        reviews={service.provider_profile?.total_reviews || 0}
+        price={`$${service.base_price}`}
+        location="Local Area"
+      />
     </motion.div>
   );
 
