@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -181,6 +182,24 @@ export const useBookingsActions = () => {
         if (error) {
           console.error('❌ Database error creating booking:', error);
           console.error('❌ Booking data that failed:', bookingData);
+          
+          // If booking creation fails after payment, we need to handle refund
+          if (sessionId && paymentRecord) {
+            console.log('🔄 Booking creation failed after payment - initiating automatic refund');
+            try {
+              await supabase.functions.invoke('process-refund', {
+                body: {
+                  paymentId: paymentRecord.id,
+                  reason: 'booking_creation_failed',
+                  amount: paymentRecord.amount
+                }
+              });
+              console.log('✅ Automatic refund initiated for failed booking creation');
+            } catch (refundError) {
+              console.error('❌ Failed to initiate automatic refund:', refundError);
+            }
+          }
+          
           throw new Error(`Database error: ${error.message} (Code: ${error.code}) - Details: ${error.details || 'No details'}`);
         }
   
@@ -275,11 +294,45 @@ export const useBookingsActions = () => {
 
     setLoading(true);
     try {
+      // First get booking details to calculate refund
+      const { data: booking, error: fetchError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .eq('customer_id', user.id)
+        .single();
+
+      if (fetchError || !booking) {
+        throw new Error('Booking not found or you do not have permission to cancel it');
+      }
+
+      // Calculate refund amount based on cancellation timing
+      const serviceDate = new Date(booking.service_date);
+      const now = new Date();
+      const hoursUntilService = (serviceDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+      
+      let refundPercentage = 0;
+      if (hoursUntilService >= 24) {
+        refundPercentage = 0.9; // 90% refund if cancelled 24+ hours before
+      } else if (hoursUntilService >= 0) {
+        refundPercentage = 0.8; // 80% refund if cancelled within 24 hours
+      } else {
+        // Service already passed - no refund
+        throw new Error('Cannot cancel a booking after the scheduled service time');
+      }
+
+      const refundAmount = booking.final_price * refundPercentage;
+      const cancellationFee = booking.final_price - refundAmount;
+
+      // Update booking status
       const { error } = await supabase
         .from('bookings')
         .update({ 
           status: 'cancelled',
-          cancellation_reason: reason || 'Cancelled by customer'
+          cancellation_reason: reason || 'Cancelled by customer',
+          cancelled_at: new Date().toISOString(),
+          cancellation_fee: cancellationFee,
+          refund_amount: refundAmount
         } as Database['public']['Tables']['bookings']['Update'])
         .eq('id', bookingId)
         .eq('customer_id', user.id);
@@ -289,10 +342,49 @@ export const useBookingsActions = () => {
         throw new Error(`Failed to cancel booking: ${error.message}`);
       }
 
-      toast({
-        title: 'Booking Cancelled',
-        description: 'Your booking has been cancelled successfully.',
-      });
+      // Process refund if amount > 0
+      if (refundAmount > 0) {
+        try {
+          // Get payment record associated with this booking
+          const { data: payment } = await supabase
+            .from('payments')
+            .select('id')
+            .eq('booking_id', bookingId)
+            .single();
+
+          if (payment) {
+            await supabase.functions.invoke('process-refund', {
+              body: {
+                paymentId: payment.id,
+                reason: `Booking cancellation - ${hoursUntilService >= 24 ? '90%' : '80%'} refund`,
+                amount: refundAmount
+              }
+            });
+
+            toast({
+              title: 'Booking Cancelled',
+              description: `Your booking has been cancelled. A refund of $${refundAmount.toFixed(2)} (${refundPercentage * 100}%) will be processed to your original payment method.`,
+            });
+          } else {
+            toast({
+              title: 'Booking Cancelled',
+              description: 'Your booking has been cancelled successfully.',
+            });
+          }
+        } catch (refundError) {
+          console.error('Error processing refund:', refundError);
+          toast({
+            title: 'Booking Cancelled',
+            description: `Your booking has been cancelled. There was an issue processing the refund - please contact support. Reference: ${booking.booking_number}`,
+            variant: 'destructive',
+          });
+        }
+      } else {
+        toast({
+          title: 'Booking Cancelled',
+          description: 'Your booking has been cancelled successfully.',
+        });
+      }
 
       return true;
     } catch (error) {

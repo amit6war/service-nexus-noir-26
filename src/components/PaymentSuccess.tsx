@@ -65,14 +65,10 @@ const PaymentSuccess = () => {
     console.log('🔍 Session ID check:');
     console.log('  - SessionId:', sessionId);
     console.log('  - Current URL:', window.location.href);
-    console.log('  - Parsed URL search params:', Object.fromEntries(new URLSearchParams(window.location.search).entries()));
     
     // CRITICAL: If no session_id found, this might not be a legitimate payment success
-    // Only proceed without session_id in very specific fallback scenarios
     if (!sessionId) {
       console.log('❌ No session_id found in URL parameters');
-      console.log('   - This suggests the user reached this page without completing Stripe checkout');
-      console.log('   - OR there was a technical issue with the redirect');
       
       // Check if this is a recent checkout attempt
       const checkoutTimestamp = sessionStorage.getItem('checkoutTimestamp');
@@ -80,7 +76,6 @@ const PaymentSuccess = () => {
       
       if (checkoutTimestamp && timeElapsed < 5 * 60 * 1000) { // Within 5 minutes
         console.log('⚠️ Recent checkout detected without session_id - possible technical issue');
-        console.log('   Time elapsed since checkout:', timeElapsed / 1000, 'seconds');
         setError('Payment verification failed. This might be due to a technical issue. Please try the fallback option or contact support if you were charged.');
       } else {
         console.log('❌ No recent checkout or session expired');
@@ -120,13 +115,17 @@ const PaymentSuccess = () => {
       sessionStorage.removeItem('pendingCheckoutAddress');
       sessionStorage.removeItem('checkoutTimestamp');
 
+      // Clean up URL to remove session_id
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+
       // Set success state
       setBookingsCreated(true);
       setShowModal(true);
 
       toast({
         title: 'Payment & Booking Successful!',
-        description: `${items.length} booking${items.length !== 1 ? 's' : ''} created with confirmed status.`,
+        description: `${items.length} booking${items.length !== 1 ? 's' : ''} created successfully.`,
       });
 
       console.log('🎉 Payment success process completed successfully');
@@ -138,10 +137,16 @@ const PaymentSuccess = () => {
   
       toast({
         title: 'Booking Creation Failed',
-        description: 'Your payment was processed successfully, but we encountered an issue creating your bookings. Our team has been notified and will process a refund within 3-5 business days if needed.',
+        description: 'Your payment was processed successfully, but we encountered an issue creating your bookings. A full refund will be processed automatically.',
         variant: 'destructive',
         duration: 10000,
       });
+
+      // Initiate automatic refund for failed booking creation
+      if (sessionId) {
+        console.log('🔄 Initiating automatic refund for failed booking creation');
+        // The webhook will handle refund logic automatically
+      }
     } finally {
       setCreating(false);
     }
@@ -172,7 +177,7 @@ const PaymentSuccess = () => {
     navigate('/customer-dashboard');
   };
 
-    // Only proceed when auth is ready and user is known
+  // Only proceed when auth is ready and user is known
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('session_id');
@@ -182,7 +187,6 @@ const PaymentSuccess = () => {
     console.log('  - Auth loading:', authLoading);
     console.log('  - User:', !!user?.id);
     console.log('  - Current URL:', currentUrl);
-    console.log('  - URL params:', Object.fromEntries(urlParams.entries()));
     console.log('  - SessionId:', sessionId);
     
     // Special handling for edge cases
@@ -205,22 +209,13 @@ const PaymentSuccess = () => {
         const pendingAddress = sessionStorage.getItem('pendingCheckoutAddress');
         const checkoutTimestamp = sessionStorage.getItem('checkoutTimestamp');
         
-        console.log('📦 Pending data check:');
-        console.log('  - pendingItems:', !!pendingItems);
-        console.log('  - pendingAddress:', !!pendingAddress);
-        console.log('  - checkoutTimestamp:', checkoutTimestamp);
-        
         if (pendingItems && pendingAddress && checkoutTimestamp) {
           const timeElapsed = Date.now() - parseInt(checkoutTimestamp);
-          console.log('⏰ Time elapsed since checkout:', timeElapsed / 1000 / 60, 'minutes');
           
           if (timeElapsed < 30 * 60 * 1000) { // Within 30 minutes
-            console.log('⚠️ Found recent pending data but no session_id - this suggests a technical issue');
-            console.log('   Showing fallback handler to allow manual booking creation');
+            console.log('⚠️ Found recent pending data but no session_id - showing fallback handler');
             setShowFallback(true);
             return;
-          } else {
-            console.log('⏰ Pending data is too old (>30 minutes), ignoring');
           }
         }
         
@@ -228,8 +223,6 @@ const PaymentSuccess = () => {
         setError('No payment session found. Please contact support if you were charged.');
         setShowModal(true);
       }
-    } else {
-      console.log('⏳ Waiting for conditions: authLoading=', authLoading, 'user=', !!user?.id, 'sessionId=', !!sessionId);
     }
   }, [authLoading, user?.id]);
 
@@ -256,6 +249,7 @@ const PaymentSuccess = () => {
       </div>
     );
   }
+
   // Show loading state if still processing
   if ((authLoading || creating) && !showModal && !showFallback) {
     return (
@@ -279,7 +273,7 @@ const PaymentSuccess = () => {
         message={
           bookingsCreated
             ? 'Thank you for your payment. Your bookings have been confirmed and you will receive confirmation emails shortly.'
-            : 'Your payment was processed successfully, but we encountered an issue creating your bookings.'
+            : 'Your payment was processed successfully, but we encountered an issue creating your bookings. A full refund will be processed automatically.'
         }
         errorDetails={error || undefined}
         onViewBookings={handleViewBookings}

@@ -100,6 +100,56 @@ serve(async (req) => {
           })
           .eq("id", existing.id);
       }
+
+      // 3) Check for failed booking creation and initiate automatic refund
+      // Wait a few seconds to allow booking creation to complete
+      setTimeout(async () => {
+        try {
+          const { data: payment } = await supabaseService
+            .from("payments")
+            .select("id, booking_id, amount")
+            .eq("stripe_session_id", session.id)
+            .single();
+
+          // If payment exists but no booking is linked, booking creation failed
+          if (payment && !payment.booking_id) {
+            log("Booking creation failed for session, initiating automatic refund", { 
+              sessionId: session.id, 
+              paymentId: payment.id 
+            });
+
+            // Initiate automatic refund
+            const refund = await stripe.refunds.create({
+              payment_intent: paymentIntentId,
+              amount: session.amount_total, // Full refund
+              reason: 'requested_by_customer',
+              metadata: {
+                payment_id: payment.id,
+                reason: 'automatic_refund_booking_creation_failed',
+                session_id: session.id
+              }
+            });
+
+            // Update payment status
+            await supabaseService
+              .from("payments")
+              .update({
+                payment_status: "refunded",
+                refund_amount: payment.amount,
+                refund_reason: "Automatic refund - booking creation failed",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", payment.id);
+
+            log("Automatic refund processed for failed booking creation", { 
+              refundId: refund.id, 
+              amount: refund.amount 
+            });
+          }
+        } catch (error) {
+          log("Error checking for failed booking creation", { error: error.message });
+        }
+      }, 5000); // Wait 5 seconds
     }
 
     if (event.type === "payment_intent.payment_failed") {
@@ -149,6 +199,24 @@ serve(async (req) => {
         .from("payments")
         .update({ payment_status: "disputed", updated_at: new Date().toISOString() } as any)
         .eq("stripe_charge_id", dispute.charge as string);
+    }
+
+    // Handle refunds from Stripe (manual refunds, disputes, etc.)
+    if (event.type === "charge.refunded") {
+      const charge = event.data.object as Stripe.Charge;
+      
+      // Update payment status to refunded
+      await supabaseService
+        .from("payments")
+        .update({ 
+          payment_status: "refunded",
+          refund_amount: charge.amount_refunded / 100,
+          refund_reason: "Refunded via Stripe",
+          updated_at: new Date().toISOString() 
+        } as any)
+        .eq("stripe_charge_id", charge.id);
+
+      log("Payment refunded via Stripe", { chargeId: charge.id, refundAmount: charge.amount_refunded });
     }
 
     return new Response(JSON.stringify({ received: true }), {
