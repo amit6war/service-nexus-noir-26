@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useServices } from '@/hooks/useServices';
 import ServiceCard from './ServiceCard';
-import LoadingSpinner from './LoadingSpinner';
+import { LoadingSpinner } from './LoadingSpinner';
 import { FilterableSection } from './FilterableSection';
 
 interface Service {
@@ -15,12 +15,14 @@ interface Service {
   base_price: number;
   duration_minutes: number;
   is_featured: boolean;
-  provider_id: string;
-  provider_profiles?: {
+  provider_id?: string;
+  provider_profile?: {
     business_name: string;
     rating?: number;
     total_reviews?: number;
   };
+  price_range?: string;
+  duration_range?: string;
 }
 
 const ServiceBrowserWithFilters = () => {
@@ -92,7 +94,7 @@ const ServiceBrowserWithFilters = () => {
       <FilterableSection
         data={processedServices}
         renderItem={renderServiceCard}
-        searchFields={['title', 'description', 'category', 'subcategory', 'provider_profiles.business_name']}
+        searchFields={['title', 'description', 'category', 'subcategory', 'provider_profile.business_name']}
         filterOptions={[
           {
             key: 'category',

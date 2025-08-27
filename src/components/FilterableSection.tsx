@@ -9,9 +9,9 @@ import { Badge } from '@/components/ui/badge';
 interface FilterableSection<T> {
   data: T[];
   renderItem: (item: T) => React.ReactNode;
-  searchFields: (keyof T)[];
+  searchFields: string[];
   filterOptions?: {
-    key: keyof T;
+    key: string;
     label: string;
     values: { label: string; value: any }[];
   }[];
@@ -19,6 +19,11 @@ interface FilterableSection<T> {
   emptyMessage: string;
   className?: string;
 }
+
+// Helper function to get nested property value
+const getNestedValue = (obj: any, path: string): any => {
+  return path.split('.').reduce((current, key) => current?.[key], obj);
+};
 
 export function FilterableSection<T>({
   data,
@@ -41,7 +46,7 @@ export function FilterableSection<T>({
       const lowerSearchTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(item => 
         searchFields.some(field => {
-          const value = item[field];
+          const value = getNestedValue(item, field);
           if (value == null) return false;
           return String(value).toLowerCase().includes(lowerSearchTerm);
         })
@@ -52,7 +57,7 @@ export function FilterableSection<T>({
     Object.entries(activeFilters).forEach(([key, value]) => {
       if (value && value !== 'all') {
         filtered = filtered.filter(item => {
-          const itemValue = item[key as keyof T];
+          const itemValue = getNestedValue(item, key);
           return itemValue === value;
         });
       }
@@ -120,11 +125,11 @@ export function FilterableSection<T>({
         {showFilters && filterOptions.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/30">
             {filterOptions.map((filter) => (
-              <div key={String(filter.key)} className="space-y-2">
+              <div key={filter.key} className="space-y-2">
                 <label className="text-sm font-medium">{filter.label}</label>
                 <Select
-                  value={activeFilters[String(filter.key)] || 'all'}
-                  onValueChange={(value) => handleFilterChange(String(filter.key), value)}
+                  value={activeFilters[filter.key] || 'all'}
+                  onValueChange={(value) => handleFilterChange(filter.key, value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
