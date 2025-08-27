@@ -23,6 +23,7 @@ interface Booking {
   final_price: number;
   special_instructions?: string;
   created_at: string;
+  provider_user_id: string;
   services: {
     title: string;
     duration_minutes: number;
@@ -78,7 +79,9 @@ const MyBookings = () => {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // First, get bookings with services
+      const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
           id,
@@ -88,25 +91,43 @@ const MyBookings = () => {
           final_price,
           special_instructions,
           created_at,
+          provider_user_id,
           services (
             title,
             duration_minutes
-          ),
-          provider_profiles (
-            business_name,
-            business_phone,
-            rating,
-            total_reviews
           )
         `)
         .eq('customer_id', user.id)
         .order('service_date', { ascending: false });
 
-      if (error) {
-        throw error;
+      if (bookingsError) {
+        throw bookingsError;
       }
 
-      setBookings(data || []);
+      if (!bookingsData) {
+        setBookings([]);
+        return;
+      }
+
+      // Then, get provider profiles for each booking
+      const providerIds = [...new Set(bookingsData.map(booking => booking.provider_user_id))];
+      
+      const { data: providerData, error: providerError } = await supabase
+        .from('provider_profiles')
+        .select('user_id, business_name, business_phone, rating, total_reviews')
+        .in('user_id', providerIds);
+
+      if (providerError) {
+        console.error('Error loading provider profiles:', providerError);
+      }
+
+      // Map provider data to bookings
+      const bookingsWithProviders = bookingsData.map(booking => ({
+        ...booking,
+        provider_profiles: providerData?.find(provider => provider.user_id === booking.provider_user_id) || null
+      }));
+
+      setBookings(bookingsWithProviders);
     } catch (error) {
       console.error('Error loading bookings:', error);
       toast({
