@@ -54,7 +54,7 @@ export interface CartItem {
   provider_name: string;
   price: number;
   duration_minutes: number;
-  scheduled_date: string;
+  scheduled_date: string; // Make this required to match usage
   special_instructions?: string;
 }
 

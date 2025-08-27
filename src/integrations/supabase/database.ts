@@ -48,6 +48,7 @@ export interface Database {
           cancelled_at?: string | null;
           cancellation_fee?: number | null;
           refund_amount?: number | null;
+          cancellation_reason?: string | null;
         };
         Insert: {
           customer_id: string;
@@ -73,6 +74,7 @@ export interface Database {
           service_zip?: string | null;
           booking_number: string;
           confirmed_at?: string | null;
+          cancellation_reason?: string | null;
           // Allow additional fields without being overly strict
           [key: string]: unknown;
         };
@@ -91,6 +93,7 @@ export interface Database {
           cancellation_fee: number | null;
           refund_amount: number | null;
           updated_at: string;
+          cancellation_reason: string | null;
           // Allow additional fields without being overly strict
           [key: string]: unknown;
         }>;
@@ -104,6 +107,8 @@ export interface Database {
           booking_id?: string | null;
           provider_user_id?: string | null;
           updated_at?: string | null;
+          customer_id?: string | null;
+          payment_intent_id?: string | null;
         };
         Insert: { [key: string]: unknown };
         Update: { [key: string]: unknown };
@@ -144,4 +149,3 @@ export interface Database {
     };
   };
 }
-
