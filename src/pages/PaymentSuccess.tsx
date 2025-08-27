@@ -1,9 +1,9 @@
 
 import React from 'react';
-import PaymentSuccessComponent from '@/components/PaymentSuccess';
+import PaymentSuccessHandler from '@/components/PaymentSuccessHandler';
 
 const PaymentSuccess = () => {
-  return <PaymentSuccessComponent />;
+  return <PaymentSuccessHandler />;
 };
 
 export default PaymentSuccess;

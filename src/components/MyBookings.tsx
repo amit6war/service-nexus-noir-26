@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import BookingStatusBadge from './BookingStatusBadge';
 import RescheduleModal from './RescheduleModal';
+import { FilterableSection } from './FilterableSection';
 import type { Database } from '@/integrations/supabase/types';
 
 type BookingStatus = Database['public']['Enums']['booking_status'];
@@ -331,6 +332,16 @@ const MyBookings = () => {
     );
   }
 
+  const statusFilterOptions = [
+    { label: 'Pending', value: 'pending' },
+    { label: 'Confirmed', value: 'confirmed' },
+    { label: 'Accepted', value: 'accepted' },
+    { label: 'In Progress', value: 'in_progress' },
+    { label: 'Completed', value: 'completed' },
+    { label: 'Cancelled', value: 'cancelled' },
+    { label: 'Disputed', value: 'disputed' }
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -347,51 +358,64 @@ const MyBookings = () => {
         </TabsList>
         
         <TabsContent value="all" className="space-y-4">
-          {bookings.length === 0 ? (
-            <div className="text-center py-12">
-              <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">No bookings yet</h3>
-              <p className="text-muted-foreground">Your bookings will appear here once you book a service.</p>
-            </div>
-          ) : (
-            bookings.map(renderBookingCard)
-          )}
+          <FilterableSection
+            data={bookings}
+            renderItem={renderBookingCard}
+            searchFields={['booking_number', 'services.title', 'provider_profiles.business_name', 'special_instructions']}
+            filterOptions={[
+              {
+                key: 'status',
+                label: 'Status',
+                values: statusFilterOptions
+              }
+            ]}
+            title="All Bookings"
+            emptyMessage="No bookings yet. Your bookings will appear here once you book a service."
+          />
         </TabsContent>
         
         <TabsContent value="upcoming" className="space-y-4">
-          {filterBookings('upcoming').length === 0 ? (
-            <div className="text-center py-12">
-              <Clock className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">No upcoming bookings</h3>
-              <p className="text-muted-foreground">Book a service to see your upcoming appointments here.</p>
-            </div>
-          ) : (
-            filterBookings('upcoming').map(renderBookingCard)
-          )}
+          <FilterableSection
+            data={filterBookings('upcoming')}
+            renderItem={renderBookingCard}
+            searchFields={['booking_number', 'services.title', 'provider_profiles.business_name', 'special_instructions']}
+            filterOptions={[
+              {
+                key: 'status',
+                label: 'Status',
+                values: statusFilterOptions.filter(s => !['cancelled', 'completed'].includes(s.value))
+              }
+            ]}
+            title="Upcoming Bookings"
+            emptyMessage="No upcoming bookings. Book a service to see your upcoming appointments here."
+          />
         </TabsContent>
         
         <TabsContent value="past" className="space-y-4">
-          {filterBookings('past').length === 0 ? (
-            <div className="text-center py-12">
-              <CheckCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">No past bookings</h3>
-              <p className="text-muted-foreground">Your completed bookings will appear here.</p>
-            </div>
-          ) : (
-            filterBookings('past').map(renderBookingCard)
-          )}
+          <FilterableSection
+            data={filterBookings('past')}
+            renderItem={renderBookingCard}
+            searchFields={['booking_number', 'services.title', 'provider_profiles.business_name', 'special_instructions']}
+            filterOptions={[
+              {
+                key: 'status',
+                label: 'Status',
+                values: statusFilterOptions
+              }
+            ]}
+            title="Past Bookings"
+            emptyMessage="No past bookings. Your completed bookings will appear here."
+          />
         </TabsContent>
         
         <TabsContent value="cancelled" className="space-y-4">
-          {filterBookings('cancelled').length === 0 ? (
-            <div className="text-center py-12">
-              <XCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">No cancelled bookings</h3>
-              <p className="text-muted-foreground">Cancelled bookings will appear here.</p>
-            </div>
-          ) : (
-            filterBookings('cancelled').map(renderBookingCard)
-          )}
+          <FilterableSection
+            data={filterBookings('cancelled')}
+            renderItem={renderBookingCard}
+            searchFields={['booking_number', 'services.title', 'provider_profiles.business_name', 'special_instructions']}
+            title="Cancelled Bookings"
+            emptyMessage="No cancelled bookings. Cancelled bookings will appear here."
+          />
         </TabsContent>
       </Tabs>
     </div>
