@@ -1,378 +1,274 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useShoppingCart } from '@/hooks/useShoppingCart';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { loadStripe } from '@stripe/stripe-js';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, CreditCard, MapPin, Calendar, Clock, User } from 'lucide-react';
-import { formatError } from '@/lib/errorFormatter';
 
-// Get Stripe publishable key from environment
-const stripePromise = loadStripe('pk_test_51QP7v3JGHirLNzkjvNi9jxNbBkFwJeGnwL6Ui9CU5wOXdexY8d5Re4LFNU9dnzmQ0RDSvb3sNJC0mzLcc9Bol4SW00z5X37P2l');
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { ShoppingCart, CreditCard, MapPin, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { useShoppingCart } from '@/hooks/useShoppingCart';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
+import AddressManager, { Address } from '@/components/AddressManager';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import EnhancedCheckoutItem from '@/components/EnhancedCheckoutItem';
 
 const Checkout = () => {
+  const { items, getTotalPrice } = useShoppingCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const { items, getTotalPrice, clearCart } = useShoppingCart();
   const { toast } = useToast();
+  
+  const [loading, setLoading] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
 
-  const [processing, setProcessing] = useState(false);
-  const [address, setAddress] = useState({
-    address_line_1: '',
-    address_line_2: '',
-    city: '',
-    state: '',
-    postal_code: ''
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!address.address_line_1.trim()) {
-      newErrors.address_line_1 = 'Street address is required';
-    }
-    if (!address.city.trim()) {
-      newErrors.city = 'City is required';
-    }
-    if (!address.state.trim()) {
-      newErrors.state = 'State is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handleAddressSelect = (address: Address) => {
+    setSelectedAddress(address);
   };
 
-  const generateIdempotencyKey = () => {
-    return `checkout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  };
-
-  const handleCheckout = async () => {
+  const handlePayment = async () => {
+    // Check authentication
     if (!user) {
       toast({
         title: 'Authentication Required',
-        description: 'Please sign in to proceed with checkout.',
-        variant: 'destructive',
+        description: 'Please log in to proceed with checkout.',
+        variant: 'destructive'
       });
-      return;
-    }
-
-    if (!validateForm()) {
-      toast({
-        title: 'Form Validation Failed',
-        description: 'Please check the form for errors.',
-        variant: 'destructive',
-      });
+      navigate('/auth');
       return;
     }
 
     if (items.length === 0) {
       toast({
         title: 'Empty Cart',
-        description: 'Please add items to your cart before checkout.',
-        variant: 'destructive',
+        description: 'Please add services to your cart before checkout.',
+        variant: 'destructive'
       });
       return;
     }
 
-    setProcessing(true);
+    if (!selectedAddress) {
+      toast({
+        title: 'Address Required',
+        description: 'Please select a service address.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const itemsWithoutDate = items.filter(item => !item.scheduled_date);
+    if (itemsWithoutDate.length > 0) {
+      toast({
+        title: 'Missing Schedule',
+        description: 'All services must have a scheduled date before checkout.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setLoading(true);
 
     try {
-      console.log('🛒 Starting checkout process with items:', items.length);
+      const addressForCheckout = {
+        address_line_1: selectedAddress.address_line_1,
+        address_line_2: selectedAddress.address_line_2 || '',
+        city: selectedAddress.city,
+        state: selectedAddress.state,
+        zip_code: selectedAddress.postal_code,
+        country: selectedAddress.country
+      };
 
-      // Store checkout data in session storage
-      sessionStorage.setItem('pendingCheckoutItems', JSON.stringify(items));
-      sessionStorage.setItem('pendingCheckoutAddress', JSON.stringify(address));
-      sessionStorage.setItem('checkoutTimestamp', Date.now().toString());
+      // Store complete cart data in sessionStorage before payment
+      const checkoutData = {
+        items: items,
+        address: addressForCheckout,
+        timestamp: Date.now()
+      };
+      
+      sessionStorage.setItem('pendingCheckoutItems', JSON.stringify(checkoutData.items));
+      sessionStorage.setItem('pendingCheckoutAddress', JSON.stringify(checkoutData.address));
+      sessionStorage.setItem('checkoutTimestamp', checkoutData.timestamp.toString());
 
-      // Create payment intent using our edge function
-      const idempotencyKey = generateIdempotencyKey();
-      console.log('🔑 Generated idempotency key:', idempotencyKey);
-
-      const { data, error } = await supabase.functions.invoke('create-payment-intent', {
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          items,
-          address,
-          idempotency_key: idempotencyKey
+          items: items,
+          address: addressForCheckout
         }
       });
 
       if (error) {
-        throw new Error(error.message);
+        console.error('Checkout error:', error);
+        throw error;
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to create payment intent');
+      if (!data?.url) {
+        throw new Error('No checkout URL received');
       }
 
-      console.log('✅ Payment intent created:', data.payment_intent.id);
-
-      // Get Stripe and redirect to checkout
-      const stripe = await stripePromise;
-      if (!stripe) {
-        throw new Error('Stripe failed to load');
-      }
-
-      // Store the payment intent data
-      sessionStorage.setItem('paymentIntentData', JSON.stringify(data));
-
-      // Redirect to Stripe Checkout using the client secret
-      const { error: stripeError } = await stripe.redirectToCheckout({
-        sessionId: data.payment_intent.id // This should be a session ID, not payment intent ID
-      });
-
-      // If redirectToCheckout fails, try using confirmPayment
-      if (stripeError) {
-        console.log('Checkout redirect failed, trying payment confirmation:', stripeError);
-        
-        // Use Elements for payment confirmation
-        const { error: confirmError } = await stripe.confirmPayment({
-          clientSecret: data.payment_intent.client_secret,
-          confirmParams: {
-            return_url: `${window.location.origin}/payment-success`,
-          },
-        });
-
-        if (confirmError) {
-          throw new Error(confirmError.message);
-        }
-      }
+      // Redirect to Stripe checkout
+      window.location.href = data.url;
 
     } catch (error) {
-      const errorMessage = formatError(error);
-      console.error('❌ Checkout failed:', error);
-      
+      console.error('Payment error:', error);
       toast({
-        title: 'Checkout Failed',
-        description: errorMessage,
-        variant: 'destructive',
+        title: 'Payment Failed',
+        description: 'There was an error processing your payment. Please try again.',
+        variant: 'destructive'
       });
-
-      // Clear session storage on error
-      sessionStorage.removeItem('pendingCheckoutItems');
-      sessionStorage.removeItem('pendingCheckoutAddress');
-      sessionStorage.removeItem('checkoutTimestamp');
-      sessionStorage.removeItem('paymentIntentData');
     } finally {
-      setProcessing(false);
+      setLoading(false);
     }
   };
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
+  const totalPrice = getTotalPrice();
 
-  // Redirect if cart is empty
-  useEffect(() => {
-    if (items.length === 0 && !authLoading) {
-      navigate('/services');
-    }
-  }, [items.length, authLoading, navigate]);
-
-  if (authLoading) {
+  if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading checkout...</p>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <ShoppingCart className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Your cart is empty</h2>
+            <p className="text-muted-foreground mb-6">Add some services to get started</p>
+            <Button onClick={() => navigate('/customer-dashboard')} className="bg-teal hover:bg-teal/90">
+              Browse Services
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    return null; // Will redirect to auth
-  }
-
-  const totalPrice = getTotalPrice();
-
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="container mx-auto px-4 max-w-6xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Checkout</h1>
-          <p className="text-muted-foreground">Review your order and complete your booking</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Order Summary */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShoppingCart className="w-5 h-5" />
-                  Order Summary
-                </CardTitle>
-                <CardDescription>
-                  {items.length} item{items.length !== 1 ? 's' : ''} in your cart
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {items.map((item) => (
-                  <div key={item.id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold">{item.service_title}</h3>
-                      <span className="font-bold">${item.price}</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <div className="flex items-center gap-1">
-                        <User className="w-3 h-3" />
-                        <span>{item.provider_name}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>{new Date(item.scheduled_date).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>{item.duration_minutes} minutes</span>
-                      </div>
-                      {item.special_instructions && (
-                        <div className="mt-2 p-2 bg-muted rounded text-xs">
-                          <strong>Instructions:</strong> {item.special_instructions}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Subtotal</span>
-                    <span>${totalPrice.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Platform Fee</span>
-                    <span>${(totalPrice * 0.1).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Tax</span>
-                    <span>${(totalPrice * 0.08).toFixed(2)}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span>${(totalPrice * 1.18).toFixed(2)}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-4 mb-8">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/customer-dashboard')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
+            </Button>
+            <h1 className="text-3xl font-bold">Checkout</h1>
           </div>
 
-          {/* Checkout Form */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="w-5 h-5" />
-                  Service Address
-                </CardTitle>
-                <CardDescription>
-                  Where should the service be provided?
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="address_line_1">Street Address *</Label>
-                  <Input
-                    id="address_line_1"
-                    value={address.address_line_1}
-                    onChange={(e) => setAddress(prev => ({ ...prev, address_line_1: e.target.value }))}
-                    placeholder="123 Main Street"
-                    className={errors.address_line_1 ? 'border-red-500' : ''}
-                  />
-                  {errors.address_line_1 && (
-                    <p className="text-sm text-red-500">{errors.address_line_1}</p>
-                  )}
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Enhanced Order Summary */}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5" />
+                    Order Summary ({items.length} service{items.length !== 1 ? 's' : ''})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {items.map((item) => (
+                    <EnhancedCheckoutItem key={item.id} item={item} />
+                  ))}
+                  
+                  <Separator />
+                  
+                  <div className="flex justify-between items-center text-xl font-bold">
+                    <span>Total:</span>
+                    <span className="text-teal">${totalPrice}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="address_line_2">Apartment, Suite, etc.</Label>
-                  <Input
-                    id="address_line_2"
-                    value={address.address_line_2}
-                    onChange={(e) => setAddress(prev => ({ ...prev, address_line_2: e.target.value }))}
-                    placeholder="Apt 4B (optional)"
+            {/* Service Address & Payment */}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5" />
+                    Select Service Address
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AddressManager
+                    onAddressSelect={handleAddressSelect}
+                    selectedAddressId={selectedAddress?.id}
+                    showSelection={true}
                   />
-                </div>
+                </CardContent>
+              </Card>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City *</Label>
-                    <Input
-                      id="city"
-                      value={address.city}
-                      onChange={(e) => setAddress(prev => ({ ...prev, city: e.target.value }))}
-                      placeholder="New York"
-                      className={errors.city ? 'border-red-500' : ''}
-                    />
-                    {errors.city && (
-                      <p className="text-sm text-red-500">{errors.city}</p>
-                    )}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
+                    Payment Method
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-4 border border-border rounded-lg bg-muted/20">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="w-5 h-5 text-teal" />
+                      <div>
+                        <div className="font-medium">Credit/Debit Card</div>
+                        <div className="text-sm text-muted-foreground">Secure payment via Stripe</div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="state">State *</Label>
-                    <Input
-                      id="state"
-                      value={address.state}
-                      onChange={(e) => setAddress(prev => ({ ...prev, state: e.target.value }))}
-                      placeholder="NY"
-                      className={errors.state ? 'border-red-500' : ''}
-                    />
-                    {errors.state && (
-                      <p className="text-sm text-red-500">{errors.state}</p>
-                    )}
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-semibold text-blue-800 mb-2">Test Payment Information</h4>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      <p><strong>Test Card:</strong> 4242 4242 4242 4242</p>
+                      <p><strong>Expiry:</strong> Any future date (e.g., 12/25)</p>
+                      <p><strong>CVV:</strong> Any 3 digits (e.g., 123)</p>
+                      <p><strong>ZIP:</strong> Any 5 digits (e.g., 12345)</p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="postal_code">Postal Code</Label>
-                  <Input
-                    id="postal_code"
-                    value={address.postal_code}
-                    onChange={(e) => setAddress(prev => ({ ...prev, postal_code: e.target.value }))}
-                    placeholder="10001"
-                  />
-                </div>
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      <strong>Secure Payment:</strong> You'll be redirected to Stripe's secure checkout page to complete your payment.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
 
-                <Button
-                  onClick={handleCheckout}
-                  disabled={processing || items.length === 0}
-                  className="w-full"
-                  size="lg"
-                >
-                  {processing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Pay ${(totalPrice * 1.18).toFixed(2)}
-                    </>
-                  )}
-                </Button>
-
-                <div className="text-xs text-muted-foreground text-center">
-                  By clicking "Pay", you agree to our Terms of Service and Privacy Policy.
-                  Your payment is secured with 256-bit SSL encryption.
-                </div>
-              </CardContent>
-            </Card>
+              <Button
+                onClick={handlePayment}
+                disabled={loading || !selectedAddress || !user}
+                className="w-full h-14 text-lg bg-teal hover:bg-teal/90"
+                size="lg"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                    />
+                    Processing Payment...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5" />
+                    Complete Payment - ${totalPrice}
+                  </div>
+                )}
+              </Button>
+              
+              {!selectedAddress && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Please select a service address to continue
+                </p>
+              )}
+              
+              {!user && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Please log in to complete your purchase
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
