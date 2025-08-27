@@ -140,11 +140,11 @@ export const usePaymentSystem = () => {
 
     try {
       const { data, error } = await supabase
-        .from('payment_intents')
+        .from('payments')
         .select('*')
-        .eq('stripe_payment_intent_id', paymentIntentId)
-        .eq('user_id', user.id)
-        .single();
+        .eq('payment_intent_id', paymentIntentId)
+        .eq('customer_id', user.id)
+        .maybeSingle();
 
       if (error) {
         console.error('❌ Error fetching payment status:', error);
