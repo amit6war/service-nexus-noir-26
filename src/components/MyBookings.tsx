@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, MapPin, User, Phone, Star, AlertCircle, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
@@ -93,7 +92,7 @@ const MyBookings = () => {
             title,
             duration_minutes
           ),
-          provider_profiles!provider_user_id (
+          provider_profiles!bookings_provider_user_id_fkey (
             business_name,
             business_phone,
             rating,
