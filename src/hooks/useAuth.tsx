@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -244,6 +243,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const signUp = async (email: string, password: string, userData?: any, role: AppRole = 'customer') => {
     console.log('[Auth] Starting signup process for role:', role);
     
+    try {
+      // First check if user already exists
+      const { data: existingUser } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: 'test' // This will fail if user doesn't exist
+      });
+
+      if (existingUser.user) {
+        toast({
+          title: "Account Already Exists",
+          description: "An account with this email already exists. Please sign in instead.",
+          variant: "destructive",
+        });
+        return { error: { message: "User already exists" } };
+      }
+    } catch (error) {
+      // User doesn't exist, proceed with signup
+      console.log('[Auth] User does not exist, proceeding with signup');
+    }
+
     const redirectUrl = `${window.location.origin}/`;
     
     const signupData = {
@@ -252,11 +271,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       options: {
         emailRedirectTo: redirectUrl,
         data: {
-          ...userData,
+          first_name: userData?.first_name || '',
+          last_name: userData?.last_name || '',
+          phone: userData?.phone || '',
+          gender: userData?.gender || '',
           role: role
         }
       }
     };
+
+    console.log('[Auth] Signup data:', signupData);
 
     const { data, error } = await supabase.auth.signUp(signupData);
 
@@ -267,6 +291,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       if (error.message.includes('User already registered')) {
         errorMessage = "An account with this email already exists. Please use a different email or sign in instead.";
+      } else if (error.message.includes('Database error')) {
+        errorMessage = "There was a technical issue creating your account. Please try again in a moment.";
+      } else if (error.message.includes('app_role')) {
+        errorMessage = "Account setup is being configured. Please try again in a moment.";
       }
       
       toast({
@@ -279,8 +307,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       if (data.user && !data.user.email_confirmed_at) {
         toast({
-          title: "Success",
-          description: "Please check your email to confirm your account before signing in.",
+          title: "Account Created Successfully!",
+          description: "Please check your email to verify your account before signing in.",
+        });
+      } else if (data.user && data.user.email_confirmed_at) {
+        toast({
+          title: "Account Created Successfully!",
+          description: "You can now sign in with your credentials.",
         });
       }
     }
