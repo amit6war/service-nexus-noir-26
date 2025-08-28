@@ -1,8 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useCartV2 } from '@/hooks/useCartV2';
+import { useCart } from '@/hooks/useCart';
 import { useBookingsActionsV3 } from '@/hooks/useBookingsActionsV3';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +13,7 @@ const PaymentSuccessHandlerV2: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { items, clearCart, loading: cartLoading } = useCartV2();
+  const { items, clearCart, loading: cartLoading } = useCart();
   const { createBookingsFromCart } = useBookingsActionsV3();
   const { toast } = useToast();
   const [processing, setProcessing] = useState(true);
@@ -31,7 +30,6 @@ const PaymentSuccessHandlerV2: React.FC = () => {
         return;
       }
 
-      // Wait for cart to load if it's still loading
       if (cartLoading) {
         return;
       }
@@ -39,7 +37,6 @@ const PaymentSuccessHandlerV2: React.FC = () => {
       try {
         console.log('🔄 Processing payment success for session:', sessionId);
         
-        // Get pending checkout data from session storage
         const pendingItems = sessionStorage.getItem('pendingCheckoutItems');
         const pendingAddress = sessionStorage.getItem('pendingCheckoutAddress');
 
@@ -63,14 +60,12 @@ const PaymentSuccessHandlerV2: React.FC = () => {
 
         console.log('📋 Processing', itemsToProcess.length, 'items for booking creation');
 
-        // Create bookings from cart items
         await createBookingsFromCart({
           items: itemsToProcess,
           address: addressToUse,
           sessionId: sessionId
         });
 
-        // Clear session data
         console.log('🧹 Clearing session data...');
         sessionStorage.removeItem('pendingCheckoutItems');
         sessionStorage.removeItem('pendingCheckoutAddress');
@@ -126,29 +121,6 @@ const PaymentSuccessHandlerV2: React.FC = () => {
               <CardDescription>
                 Please wait while we confirm your payment and create your bookings...
               </CardDescription>
-              
-              <motion.div 
-                className="flex space-x-1 justify-center mt-4"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-              >
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="w-2 h-2 bg-blue rounded-full"
-                    animate={{
-                      scale: [1, 1.5, 1],
-                      opacity: [0.5, 1, 0.5],
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Infinity,
-                      delay: i * 0.2,
-                    }}
-                  />
-                ))}
-              </motion.div>
             </CardHeader>
           </Card>
         </motion.div>
