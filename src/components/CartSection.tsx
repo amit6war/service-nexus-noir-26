@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, User, Trash2, ShoppingCart as CartIcon } from 'lucide-react';
@@ -14,7 +13,7 @@ interface CartSectionProps {
   onClose: () => void;
 }
 
-export const CartSection: React.FC<CartSectionProps> = ({ isOpen, onClose }) => {
+const CartSection: React.FC<CartSectionProps> = ({ isOpen, onClose }) => {
   const { items, removeItem, getTotalPrice, clearCart, itemCount, loading } = useCart();
   const navigate = useNavigate();
 
@@ -212,3 +211,5 @@ export const CartSection: React.FC<CartSectionProps> = ({ isOpen, onClose }) => 
     </AnimatePresence>
   );
 };
+
+export default CartSection;
