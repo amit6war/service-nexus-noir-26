@@ -1,14 +1,14 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, User, Trash2, ShoppingCart as CartIcon, Loader2 } from 'lucide-react';
+import { X, Clock, User, Trash2, ShoppingCart as CartIcon, Loader2, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCartV2 } from '@/hooks/useCartV2';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { LoadingCart, LoadingCartSkeleton } from '@/components/LoadingCart';
+import { LoadingCart } from '@/components/LoadingCart';
 
 interface CartSectionV2Props {
   isOpen: boolean;
@@ -16,8 +16,15 @@ interface CartSectionV2Props {
 }
 
 export const CartSectionV2: React.FC<CartSectionV2Props> = ({ isOpen, onClose }) => {
-  const { items, removeItem, getTotalPrice, clearCart, itemCount, loading, syncing } = useCartV2();
+  const { items, removeItem, getTotalPrice, clearCart, itemCount, loading, syncing, refreshCart } = useCartV2();
   const navigate = useNavigate();
+
+  // Auto-refresh cart when component becomes visible
+  useEffect(() => {
+    if (isOpen && !loading) {
+      console.log('🔄 Cart section opened, ensuring fresh data');
+    }
+  }, [isOpen, loading]);
 
   const handleProceedToCheckout = () => {
     onClose();
@@ -25,11 +32,24 @@ export const CartSectionV2: React.FC<CartSectionV2Props> = ({ isOpen, onClose })
   };
 
   const handleRemoveItem = async (itemId: string) => {
-    await removeItem(itemId);
+    console.log('🗑️ Removing item:', itemId);
+    const success = await removeItem(itemId);
+    if (success) {
+      console.log('✅ Item removed successfully');
+    }
   };
 
   const handleClearCart = async () => {
-    await clearCart();
+    console.log('🧹 Clearing entire cart');
+    const success = await clearCart();
+    if (success) {
+      console.log('✅ Cart cleared successfully');
+    }
+  };
+
+  const handleRefreshCart = () => {
+    console.log('🔄 Manual cart refresh requested');
+    refreshCart();
   };
 
   return (
@@ -74,13 +94,44 @@ export const CartSectionV2: React.FC<CartSectionV2Props> = ({ isOpen, onClose })
                     {loading ? 'Loading...' : itemCount === 0 ? 'No items' : `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`} in your cart
                   </p>
                 </div>
-                <Badge variant="secondary" className="text-lg px-3 py-1">
-                  {loading ? '...' : itemCount}
-                </Badge>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={itemCount}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Badge variant="secondary" className="text-lg px-3 py-1">
+                      {loading ? '...' : itemCount}
+                    </Badge>
+                  </motion.div>
+                </AnimatePresence>
               </div>
-              <Button variant="ghost" size="lg" onClick={onClose} className="h-12 w-12">
-                <X className="w-6 h-6" />
-              </Button>
+              
+              <div className="flex items-center gap-2">
+                {/* Refresh Button */}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleRefreshCart}
+                  disabled={loading || syncing}
+                  className="h-10 w-10 p-0"
+                  title="Refresh cart"
+                >
+                  <motion.div
+                    animate={loading || syncing ? { rotate: 360 } : { rotate: 0 }}
+                    transition={{ duration: 1, repeat: loading || syncing ? Infinity : 0, ease: "linear" }}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </motion.div>
+                </Button>
+                
+                {/* Close Button */}
+                <Button variant="ghost" size="lg" onClick={onClose} className="h-12 w-12">
+                  <X className="w-6 h-6" />
+                </Button>
+              </div>
             </div>
 
             {/* Cart Content */}
@@ -106,6 +157,7 @@ export const CartSectionV2: React.FC<CartSectionV2Props> = ({ isOpen, onClose })
                     <motion.div 
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
                       className="mb-4 p-3 bg-teal/5 border border-teal/20 rounded-lg flex items-center gap-2"
                     >
                       <Loader2 className="w-4 h-4 animate-spin text-teal" />
@@ -113,95 +165,119 @@ export const CartSectionV2: React.FC<CartSectionV2Props> = ({ isOpen, onClose })
                     </motion.div>
                   )}
                   
-                  <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-                    {items.map((item, index) => (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ delay: index * 0.1 }}
-                        layout
-                      >
-                        <Card className="h-full hover:shadow-lg transition-shadow">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <CardTitle className="text-xl mb-2">{item.service_name}</CardTitle>
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <User className="w-4 h-4" />
-                                  <span>{item.provider_name}</span>
+                  <AnimatePresence mode="popLayout">
+                    <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+                      {items.map((item, index) => (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -20, scale: 0.95 }}
+                          transition={{ 
+                            delay: index * 0.05,
+                            duration: 0.2,
+                            layout: { duration: 0.2 }
+                          }}
+                          layout
+                        >
+                          <Card className="h-full hover:shadow-lg transition-shadow">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <CardTitle className="text-xl mb-2">{item.service_name}</CardTitle>
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <User className="w-4 h-4" />
+                                    <span>{item.provider_name}</span>
+                                  </div>
                                 </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveItem(item.id)}
+                                  disabled={syncing}
+                                  className="text-red-500 hover:text-red-600 hover:bg-red-50 h-10 w-10 p-0 disabled:opacity-50"
+                                >
+                                  {syncing ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-5 h-5" />
+                                  )}
+                                </Button>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveItem(item.id)}
-                                disabled={syncing}
-                                className="text-red-500 hover:text-red-600 hover:bg-red-50 h-10 w-10 p-0 disabled:opacity-50"
-                              >
-                                {syncing ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="w-5 h-5" />
-                                )}
-                              </Button>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <Clock className="w-4 h-4" />
-                                  <span>{item.duration_minutes} minutes</span>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Clock className="w-4 h-4" />
+                                    <span>{item.duration_minutes} minutes</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <motion.span 
+                                      key={item.final_price}
+                                      initial={{ scale: 1.1 }}
+                                      animate={{ scale: 1 }}
+                                      className="text-2xl font-bold text-teal"
+                                    >
+                                      ${item.final_price}
+                                    </motion.span>
+                                  </div>
                                 </div>
-                                <div className="text-right">
-                                  <span className="text-2xl font-bold text-teal">${item.final_price}</span>
-                                </div>
-                              </div>
-                              
-                              {item.slot_start_time && (() => {
-                                const date = new Date(item.slot_start_time);
-                                const isValidDate = !isNaN(date.getTime());
                                 
-                                return isValidDate ? (
+                                {item.slot_start_time && (() => {
+                                  const date = new Date(item.slot_start_time);
+                                  const isValidDate = !isNaN(date.getTime());
+                                  
+                                  return isValidDate ? (
+                                    <div className="p-3 bg-muted/30 rounded-lg">
+                                      <div className="text-sm">
+                                        <span className="font-medium text-foreground">Scheduled:</span>
+                                        <p className="text-muted-foreground mt-1">
+                                          {format(date, 'PPP p')}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  ) : null;
+                                })()}
+                                
+                                {item.notes && (
                                   <div className="p-3 bg-muted/30 rounded-lg">
                                     <div className="text-sm">
-                                      <span className="font-medium text-foreground">Scheduled:</span>
-                                      <p className="text-muted-foreground mt-1">
-                                        {format(date, 'PPP p')}
-                                      </p>
+                                      <span className="font-medium text-foreground">Notes:</span>
+                                      <p className="text-muted-foreground mt-1">{item.notes}</p>
                                     </div>
                                   </div>
-                                ) : null;
-                              })()}
-                              
-                              {item.notes && (
-                                <div className="p-3 bg-muted/30 rounded-lg">
-                                  <div className="text-sm">
-                                    <span className="font-medium text-foreground">Notes:</span>
-                                    <p className="text-muted-foreground mt-1">{item.notes}</p>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </div>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </AnimatePresence>
                 </div>
               )}
             </div>
 
             {/* Footer */}
             {!loading && itemCount > 0 && (
-              <div className="border-t bg-gradient-to-r from-muted/30 to-muted/10">
+              <motion.div 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="border-t bg-gradient-to-r from-muted/30 to-muted/10"
+              >
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <span className="text-sm text-muted-foreground">Total Amount</span>
-                      <div className="text-3xl font-bold text-teal">${getTotalPrice()}</div>
+                      <motion.div 
+                        key={getTotalPrice()}
+                        initial={{ scale: 1.05 }}
+                        animate={{ scale: 1 }}
+                        className="text-3xl font-bold text-teal"
+                      >
+                        ${getTotalPrice()}
+                      </motion.div>
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
                       <p>{itemCount} {itemCount === 1 ? 'service' : 'services'} selected</p>
@@ -241,7 +317,7 @@ export const CartSectionV2: React.FC<CartSectionV2Props> = ({ isOpen, onClose })
                     </Button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
           </motion.div>
         </>
