@@ -21,7 +21,9 @@ import {
   Upload,
   FileText,
   Eye,
-  EyeOff
+  EyeOff,
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 
 interface FormData {
@@ -35,6 +37,13 @@ interface FormData {
   confirmPassword: string;
   termsAccepted: boolean;
   idProofFile?: File | null;
+}
+
+interface PasswordValidation {
+  minLength: boolean;
+  match: boolean;
+  hasLetter: boolean;
+  hasNumber: boolean;
 }
 
 const initialFormData: FormData = {
@@ -61,11 +70,32 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [emailError, setEmailError] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
   const { signUp } = useAuth();
 
   const progress = currentStep === 1 ? 33 : currentStep === 2 ? 66 : 100;
+
+  // Password validation
+  const validatePassword = (password: string, confirmPassword: string): PasswordValidation => {
+    return {
+      minLength: password.length >= 6,
+      match: password === confirmPassword && confirmPassword.length > 0,
+      hasLetter: /[a-zA-Z]/.test(password),
+      hasNumber: /[0-9]/.test(password)
+    };
+  };
+
+  const passwordValidation = validatePassword(formData.password, formData.confirmPassword);
+  const isPasswordValid = passwordValidation.minLength && passwordValidation.hasLetter && passwordValidation.hasNumber;
+  const isConfirmPasswordValid = passwordValidation.match;
+
+  // Email validation
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -81,6 +111,15 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
         ...prev,
         [name]: value
       }));
+
+      // Real-time email validation
+      if (name === 'email') {
+        if (value && !validateEmail(value)) {
+          setEmailError('Please enter a valid email address');
+        } else {
+          setEmailError('');
+        }
+      }
     }
   };
 
@@ -114,6 +153,15 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
       return;
     }
 
+    if (!validateEmail(formData.email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Only require ID proof for service providers, no license file needed during signup
     if (formData.accountType === 'provider' && !formData.idProofFile) {
       toast({
@@ -137,10 +185,19 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
+    if (!isPasswordValid) {
+      toast({
+        title: "Password Requirements Not Met",
+        description: "Password must be at least 6 characters long and contain both letters and numbers.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isConfirmPasswordValid) {
       toast({
         title: "Password Mismatch",
-        description: "Passwords do not match.",
+        description: "Passwords do not match. Please check and try again.",
         variant: "destructive",
       });
       return;
@@ -331,8 +388,14 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
                         value={formData.email}
                         onChange={handleChange}
                         placeholder="Enter your email"
-                        className="pl-10 mt-1"
+                        className={`pl-10 mt-1 ${emailError ? 'border-red-500 focus:border-red-500' : ''}`}
                       />
+                      {emailError && (
+                        <div className="flex items-center gap-2 mt-1 text-red-500 text-sm">
+                          <AlertCircle className="w-4 h-4" />
+                          {emailError}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -435,7 +498,7 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
                         value={formData.password}
                         onChange={handleChange}
                         placeholder="Enter your password"
-                        className="pl-10 pr-12 mt-1"
+                        className={`pl-10 pr-12 mt-1 ${!isPasswordValid && formData.password ? 'border-red-500 focus:border-red-500' : isPasswordValid && formData.password ? 'border-green-500 focus:border-green-500' : ''}`}
                       />
                       <button
                         type="button"
@@ -445,6 +508,24 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
+                    
+                    {/* Password requirements */}
+                    {formData.password && (
+                      <div className="mt-2 space-y-1">
+                        <div className={`flex items-center gap-2 text-xs ${passwordValidation.minLength ? 'text-green-600' : 'text-red-500'}`}>
+                          {passwordValidation.minLength ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                          At least 6 characters
+                        </div>
+                        <div className={`flex items-center gap-2 text-xs ${passwordValidation.hasLetter ? 'text-green-600' : 'text-red-500'}`}>
+                          {passwordValidation.hasLetter ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                          Contains letters
+                        </div>
+                        <div className={`flex items-center gap-2 text-xs ${passwordValidation.hasNumber ? 'text-green-600' : 'text-red-500'}`}>
+                          {passwordValidation.hasNumber ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                          Contains numbers
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -458,7 +539,7 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
                         value={formData.confirmPassword}
                         onChange={handleChange}
                         placeholder="Confirm your password"
-                        className="pl-10 pr-12 mt-1"
+                        className={`pl-10 pr-12 mt-1 ${!isConfirmPasswordValid && formData.confirmPassword ? 'border-red-500 focus:border-red-500' : isConfirmPasswordValid && formData.confirmPassword ? 'border-green-500 focus:border-green-500' : ''}`}
                       />
                       <button
                         type="button"
@@ -468,6 +549,14 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
                         {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
+                    
+                    {/* Password match indicator */}
+                    {formData.confirmPassword && (
+                      <div className={`flex items-center gap-2 text-xs mt-2 ${isConfirmPasswordValid ? 'text-green-600' : 'text-red-500'}`}>
+                        {isConfirmPasswordValid ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                        {isConfirmPasswordValid ? 'Passwords match' : 'Passwords do not match'}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -489,7 +578,11 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
                       <ArrowLeft className="mr-2 h-4 w-4" />
                       Back
                     </Button>
-                    <Button disabled={isSubmitting} onClick={handleSubmit} className="bg-teal hover:bg-teal/90">
+                    <Button 
+                      disabled={isSubmitting || !isPasswordValid || !isConfirmPasswordValid || !formData.termsAccepted} 
+                      onClick={handleSubmit} 
+                      className="bg-teal hover:bg-teal/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       {isSubmitting ? "Creating Account..." : "Create Account"}
                     </Button>
                   </div>
