@@ -6,13 +6,11 @@ import { useToast } from '@/components/ui/use-toast';
 export interface ServiceProvider {
   user_id: string;
   business_name: string;
-  title?: string;
-  address?: string;
-  availability?: string;
-  avatar_url?: string;
+  business_address?: string;
   rating?: number;
   total_reviews?: number;
   verification_status: string;
+  description?: string;
 }
 
 export const useServicesProviders = (serviceId?: string) => {
@@ -35,19 +33,17 @@ export const useServicesProviders = (serviceId?: string) => {
 
         console.log('🔍 Fetching providers for service:', serviceId);
 
-        // Fetch providers who offer this service
+        // Fetch approved providers - using actual columns from provider_profiles table
         const { data: serviceProviders, error: providersError } = await supabase
           .from('provider_profiles')
           .select(`
             user_id,
             business_name,
-            title,
-            address,
-            availability,
-            avatar_url,
+            business_address,
             rating,
             total_reviews,
-            verification_status
+            verification_status,
+            description
           `)
           .eq('verification_status', 'approved')
           .limit(20);

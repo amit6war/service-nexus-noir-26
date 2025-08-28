@@ -121,13 +121,12 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({ selectedServi
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <Avatar>
-                        <AvatarImage src={provider.avatar_url} />
                         <AvatarFallback>{provider.business_name?.charAt(0)}</AvatarFallback>
                       </Avatar>
                       <div>
                         <CardTitle>{provider.business_name}</CardTitle>
                         <CardDescription className="text-muted-foreground">
-                          {provider.title || 'Service Provider'}
+                          {provider.description || 'Service Provider'}
                         </CardDescription>
                       </div>
                     </div>
@@ -140,11 +139,11 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({ selectedServi
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <MapPin className="w-4 h-4" />
-                      <span>{provider.address || 'No address'}</span>
+                      <span>{provider.business_address || 'No address'}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="w-4 h-4" />
-                      <span>{provider.availability || 'Available Now'}</span>
+                      <User className="w-4 h-4" />
+                      <span>Rating: {provider.rating || 'No rating'} ({provider.total_reviews || 0} reviews)</span>
                     </div>
                   </div>
                 </CardContent>
