@@ -488,6 +488,7 @@ export type Database = {
       services: {
         Row: {
           base_price: number
+          category: string | null
           category_id: string | null
           created_at: string | null
           description: string | null
@@ -499,11 +500,13 @@ export type Database = {
           is_featured: boolean | null
           price_type: string | null
           provider_id: string | null
+          subcategory: string | null
           title: string
           updated_at: string | null
         }
         Insert: {
           base_price: number
+          category?: string | null
           category_id?: string | null
           created_at?: string | null
           description?: string | null
@@ -515,11 +518,13 @@ export type Database = {
           is_featured?: boolean | null
           price_type?: string | null
           provider_id?: string | null
+          subcategory?: string | null
           title: string
           updated_at?: string | null
         }
         Update: {
           base_price?: number
+          category?: string | null
           category_id?: string | null
           created_at?: string | null
           description?: string | null
@@ -531,6 +536,7 @@ export type Database = {
           is_featured?: boolean | null
           price_type?: string | null
           provider_id?: string | null
+          subcategory?: string | null
           title?: string
           updated_at?: string | null
         }

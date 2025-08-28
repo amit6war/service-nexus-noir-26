@@ -17,6 +17,24 @@ interface CreateBookingData {
   special_instructions?: string;
 }
 
+interface CartItem {
+  service_id: string;
+  provider_id: string;
+  service_name: string;
+  provider_name: string;
+  final_price: number;
+  duration_minutes: number;
+  slot_start_time: string | null;
+  special_instructions?: string;
+}
+
+interface Address {
+  address_line_1: string;
+  city: string;
+  state: string;
+  postal_code: string;
+}
+
 export const useBookingsActionsV3 = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -73,6 +91,53 @@ export const useBookingsActionsV3 = () => {
     }
   };
 
+  const createBookingsFromCart = async ({ items, address, sessionId }: {
+    items: CartItem[];
+    address: Address;
+    sessionId: string;
+  }) => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const bookings = [];
+      
+      for (const item of items) {
+        const bookingData: CreateBookingData = {
+          customer_id: user.id,
+          provider_user_id: item.provider_id,
+          service_id: item.service_id,
+          service_date: item.slot_start_time || new Date().toISOString(),
+          duration_minutes: item.duration_minutes,
+          final_price: item.final_price,
+          service_address: address.address_line_1,
+          service_city: address.city,
+          service_state: address.state,
+          service_zip: address.postal_code,
+          special_instructions: item.special_instructions
+        };
+
+        const booking = await createBooking(bookingData);
+        if (booking) {
+          bookings.push(booking);
+        }
+      }
+
+      return bookings;
+    } catch (error) {
+      console.error('Error creating bookings from cart:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create bookings. Please try again.',
+        variant: 'destructive'
+      });
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateBookingStatus = async (bookingId: string, status: string) => {
     setLoading(true);
     try {
@@ -107,7 +172,9 @@ export const useBookingsActionsV3 = () => {
 
   return {
     createBooking,
+    createBookingsFromCart,
     updateBookingStatus,
-    loading
+    loading,
+    isCreatingBookings: loading
   };
 };
