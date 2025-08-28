@@ -1,337 +1,125 @@
-
-import React, { useState, useEffect, ChangeEvent } from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Mail, Lock, ArrowLeft, ArrowRight } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import SignupWizard from '@/components/auth/SignupWizard';
-import ConfirmationPage from '@/components/auth/ConfirmationPage';
 
 const Auth = () => {
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, signIn, loading, profileRole } = useAuth();
   const { toast } = useToast();
-  const [searchParams] = useSearchParams();
-  const [isLogin, setIsLogin] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [confirmationState, setConfirmationState] = useState<'idle' | 'confirming' | 'success' | 'error'>('idle');
-  const [resendEmail, setResendEmail] = useState('');
-  const [loginData, setLoginData] = useState({
-    email: '',
-    password: ''
-  });
+  const { signIn } = useAuth();
 
-  // Handle email confirmation
-  useEffect(() => {
-    const handleEmailConfirmation = async () => {
-      const token = searchParams.get('token');
-      const type = searchParams.get('type');
-      
-      if (token && type === 'signup') {
-        setConfirmationState('confirming');
-        
-        try {
-          const { error } = await supabase.auth.verifyOtp({
-            token_hash: token,
-            type: 'signup'
-          });
-          
-          if (error) {
-            console.error('Email confirmation error:', error);
-            setConfirmationState('error');
-            toast({
-              title: "Confirmation Failed",
-              description: "The confirmation link is invalid or expired.",
-              variant: "destructive",
-            });
-          } else {
-            setConfirmationState('success');
-            toast({
-              title: "Email Confirmed!",
-              description: "Your account has been successfully verified. You can now sign in.",
-            });
-          }
-        } catch (error) {
-          console.error('Confirmation process error:', error);
-          setConfirmationState('error');
-        }
-      }
-    };
-
-    handleEmailConfirmation();
-  }, [searchParams, toast]);
-
-  // Redirect if user is already logged in
-  useEffect(() => {
-    if (user && confirmationState !== 'success') {
-      console.log('[Auth] User logged in, redirecting based on role:', profileRole);
-      
-      // Use role from profiles table for accurate routing
-      const role = profileRole || 'customer';
-      
-      if (role === 'customer') {
-        navigate('/customer-dashboard');
-      } else if (role === 'provider') {
-        navigate('/provider-dashboard');
-      } else if (role === 'admin') {
-        navigate('/admin-dashboard');
-      } else {
-        navigate('/');
-      }
+  const handleSignIn = async () => {
+    setLoading(true);
+    const { error } = await signIn(email, password);
+    if (!error) {
+      navigate('/dashboard');
     }
-  }, [user, navigate, confirmationState, profileRole]);
-
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!loginData.email || !loginData.password) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter both email and password.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsSubmitting(true);
-  
-    try {
-      const { error } = await signIn(loginData.email, loginData.password);
-      if (!error) {
-        // Redirection handled by useEffect based on profileRole
-        console.log('[Auth] Login successful, waiting for redirect...');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
+    setLoading(false);
   };
-
-  const handleResendConfirmation = async () => {
-    if (!resendEmail) {
-      toast({
-        title: "Email Required",
-        description: "Please enter your email address to resend confirmation.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: resendEmail
-      });
-
-      if (error) {
-        toast({
-          title: "Resend Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Email Sent",
-          description: "A new confirmation email has been sent to your inbox.",
-        });
-      }
-    } catch (error) {
-      console.error('Resend error:', error);
-    }
-  };
-
-  // Email confirmation success/error screen
-  if (confirmationState === 'success' || confirmationState === 'error') {
-    return (
-      <ConfirmationPage
-        type={confirmationState}
-        onBackToHome={() => navigate('/')}
-        onContinueToSignIn={() => {
-          setConfirmationState('idle');
-          setIsLogin(true);
-        }}
-        onResendConfirmation={handleResendConfirmation}
-        email={resendEmail}
-        onEmailChange={setResendEmail}
-      />
-    );
-  }
-
-  // Show loading state while confirming
-  if (confirmationState === 'confirming') {
-    return (
-      <div className="min-h-screen bg-navy flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="card-glass text-center">
-            <div className="animate-spin w-8 h-8 border-2 border-teal border-t-transparent rounded-full mx-auto mb-4"></div>
-            <h2 className="text-lg font-semibold text-foreground mb-2">Confirming Email</h2>
-            <p className="text-muted-foreground">Please wait while we verify your account...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function handleLoginInputChange(event: ChangeEvent<HTMLInputElement>): void {
-    const { name, value } = event.target;
-    setLoginData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  }
 
   return (
-    <div className="min-h-screen bg-navy flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-navy via-navy/90 to-teal/20 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Back Button */}
-        <motion.button 
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-muted-foreground hover:text-teal transition-colors mb-8"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Back</span>
-        </motion.button>
-
         <AnimatePresence mode="wait">
-          {isLogin ? (
+          {mode === 'signin' && (
             <motion.div
-              key="login"
+              key="signin"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className="card-glass"
             >
-              {/* Login Card */}
-              <div className="card-glass">
-                <div className="text-center mb-8">
-                  <h1 className="text-2xl font-bold text-foreground mb-2">
-                    Welcome Back
-                  </h1>
-                  <p className="text-muted-foreground">
-                    Sign in to access your account
-                  </p>
+              <CardHeader className="space-y-2">
+                <CardTitle className="text-2xl font-bold text-center">Sign In</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
                 </div>
-
-                <form onSubmit={handleLoginSubmit} className="space-y-6">
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-                      Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={loginData.email}
-                      onChange={handleLoginInputChange}
-                      placeholder="Enter your email"
-                      className="input-dark w-full transition-all duration-300 focus:ring-2 focus:ring-teal/20 rounded-lg"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
-                      Password *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        id="password"
-                        name="password"
-                        value={loginData.password}
-                        onChange={handleLoginInputChange}
-                        placeholder="Enter your password"
-                        className="input-dark w-full pr-12 transition-all duration-300 focus:ring-2 focus:ring-teal/20 rounded-lg"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-teal transition-colors"
-                      >
-                        {showPassword ? '👁️' : '👁️‍🗨️'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" className="rounded border-border bg-secondary" />
-                      <span className="text-sm text-muted-foreground">Remember me</span>
-                    </label>
-                    <button type="button" className="text-sm text-teal hover:text-teal-light transition-colors">
-                      Forgot password?
-                    </button>
-                  </div>
-
-                  <motion.button 
-                    type="submit" 
-                    disabled={isSubmitting || loading}
-                    className="btn-hero w-full disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-lg"
-                    whileHover={{ scale: isSubmitting ? 1 : 1.05 }}
-                    whileTap={{ scale: isSubmitting ? 1 : 0.95 }}
-                  >
-                    {isSubmitting && '⏳'}
-                    Sign In
-                  </motion.button>
-                </form>
-
-                <div className="mt-8 text-center">
-                  <p className="text-muted-foreground">
-                    Don't have an account?
-                  </p>
-                  <button
-                    onClick={() => setIsLogin(false)}
-                    className="text-teal hover:text-teal-light font-medium transition-colors mt-1"
-                  >
-                    Sign Up
-                  </button>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
                 </div>
-              </div>
+                <Button disabled={loading} onClick={handleSignIn} className="w-full">
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </Button>
+                <div className="flex justify-between text-sm">
+                  <Button variant="link" onClick={() => setMode('forgot')}>
+                    Forgot password?
+                  </Button>
+                  <Button variant="link" onClick={() => setMode('signup')}>
+                    Create an account
+                  </Button>
+                </div>
+              </CardContent>
             </motion.div>
-          ) : (
+          )}
+          
+          {mode === 'signup' && (
+            <SignupWizard 
+              onBack={() => setMode('signin')}
+              onSuccess={() => setMode('signin')}
+            />
+          )}
+          
+          {mode === 'forgot' && (
             <motion.div
-              key="signup"
+              key="forgot"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className="card-glass"
             >
-              <SignupWizard
-                onBack={() => setIsLogin(true)}
-                onSuccess={() => {
-                  // Reset to login after successful signup
-                  setIsLogin(true);
-                }}
-              />
-
-              {/* Terms and Privacy */}
-              <div className="mt-6 pt-6 text-center">
-                <p className="text-xs text-muted-foreground">
-                  By creating an account, you agree to our{' '}
-                  <button className="text-teal hover:text-teal-light">Terms of Service</button>
-                  {' '}and{' '}
-                  <button className="text-teal hover:text-teal-light">Privacy Policy</button>
-                </p>
-              </div>
-
-              <div className="mt-6 text-center">
-                <p className="text-muted-foreground">
-                  Already have an account?
-                </p>
-                <button
-                  onClick={() => setIsLogin(true)}
-                  className="text-teal hover:text-teal-light font-medium transition-colors mt-1"
-                >
-                  Sign In
-                </button>
-              </div>
+              <CardHeader className="space-y-2">
+                <CardTitle className="text-2xl font-bold text-center">Reset Password</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <Button disabled={loading} onClick={() => {}} className="w-full">
+                  {loading ? 'Sending reset link...' : 'Send Reset Link'}
+                </Button>
+                <div className="flex justify-between text-sm">
+                  <Button variant="link" onClick={() => setMode('signin')}>
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Sign In
+                  </Button>
+                </div>
+              </CardContent>
             </motion.div>
           )}
         </AnimatePresence>

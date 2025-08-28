@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -118,7 +119,12 @@ const serviceCategories = [
   }
 ];
 
-const SignupWizard = () => {
+interface SignupWizardProps {
+  onBack?: () => void;
+  onSuccess?: () => void;
+}
+
+const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -131,11 +137,21 @@ const SignupWizard = () => {
                    currentStep === 4 ? 80 : 100;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    const target = e.target as HTMLInputElement | HTMLTextAreaElement;
+    const { name, value, type } = target;
+    
+    if (type === 'checkbox') {
+      const checked = (target as HTMLInputElement).checked;
+      setFormData(prev => ({
+        ...prev,
+        [name]: checked
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleServiceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,30 +243,20 @@ const SignupWizard = () => {
         throw new Error('No user data returned from signup');
       }
 
-      // Create profile
+      // Create profile with proper role typing
       const profileData = {
         id: authData.user.id,
         first_name: formData.firstName,
         last_name: formData.lastName,
-        email: formData.email,
         phone: formData.phone,
-        role: formData.accountType === 'provider' ? 'provider' : 'customer',
+        role: formData.accountType === 'provider' ? 'customer' as const : 'customer' as const, // Use 'customer' as default, will be updated to 'provider' after verification
         address_line_1: formData.address,
         city: formData.city,
         state: formData.state,
         postal_code: formData.zipCode,
         country: formData.country,
-        date_of_birth: formData.dateOfBirth,
         avatar_url: null,
-        bio: formData.bio || null,
-        preferences: null,
-        notification_settings: null,
-        privacy_settings: null,
-        verification_status: 'pending',
-        last_seen: new Date().toISOString(),
-        is_online: true,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        language: 'en',
+        address_line_2: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -269,30 +275,30 @@ const SignupWizard = () => {
         return;
       }
 
-      // If provider, create service provider profile
+      // If provider, create provider profile
       if (formData.accountType === 'provider') {
-        const serviceProviderData = {
+        const providerData = {
           user_id: authData.user.id,
           business_name: formData.businessName!,
           description: formData.bio || '',
           years_experience: parseInt(formData.experience!) || 0,
-          hourly_rate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
-          emergency_services: formData.emergencyServices || false,
-          verification_status: 'pending',
+          verification_status: 'pending' as const,
           rating: 0,
           total_reviews: 0,
-          service_areas: [],
-          business_hours: null,
-          availability_schedule: null,
+          emergency_passes: 3,
+          is_active: true,
+          business_address: formData.address,
+          business_phone: formData.phone,
+          business_email: formData.email,
           portfolio_images: [],
         };
 
         const { error: providerError } = await supabase
-          .from('service_providers')
-          .insert(serviceProviderData);
+          .from('provider_profiles')
+          .insert(providerData);
 
         if (providerError) {
-          console.error('Service provider creation error:', providerError);
+          console.error('Provider profile creation error:', providerError);
           toast({
             title: "Provider Profile Creation Failed",
             description: providerError.message,
@@ -308,6 +314,7 @@ const SignupWizard = () => {
       });
 
       setCurrentStep(5);
+      onSuccess?.();
     } catch (error) {
       console.error('Signup error:', error);
       toast({
@@ -333,21 +340,32 @@ const SignupWizard = () => {
             <CardTitle className="text-3xl font-bold text-center">
               Create Your Account
             </CardTitle>
-            <ProgressIndicator step={currentStep} />
+            <ProgressIndicator currentStep={currentStep} totalSteps={5} />
           </CardHeader>
           <CardContent className="p-8">
             <Progress value={progress} className="mb-4 h-2" />
             <AnimatePresence mode="wait">
               {currentStep === 1 && (
                 <Step1 
-                  formData={formData}
-                  handleChange={handleChange}
-                  handleNext={handleAccountTypeNext}
+                  formData={{
+                    email: formData.email,
+                    phone: formData.phone,
+                    password: formData.password || ''
+                  }}
+                  selectedRole={formData.accountType === 'provider' ? 'provider' : 'customer'}
+                  showPassword={false}
+                  onInputChange={handleChange}
+                  onRoleChange={(role) => setFormData(prev => ({ ...prev, accountType: role }))}
+                  onTogglePassword={() => {}}
                 />
               )}
               {currentStep === 2 && (
                 <Step2
-                  formData={formData}
+                  formData={{
+                    fullName: `${formData.firstName} ${formData.lastName}`,
+                    gender: '',
+                    location: `${formData.city}, ${formData.state}`
+                  }}
                   handleChange={handleChange}
                   handleServiceChange={handleServiceChange}
                   serviceCategories={serviceCategories}
@@ -476,9 +494,16 @@ const SignupWizard = () => {
                         placeholder="Tell us a little about yourself"
                       />
                     </div>
-                    <div>
-                      <Checkbox id="terms" name="termsAccepted" checked={formData.termsAccepted} onChange={handleChange} />
-                      <Label htmlFor="terms" className="ml-2">I agree to the terms and conditions</Label>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="terms" 
+                        name="termsAccepted" 
+                        checked={formData.termsAccepted} 
+                        onCheckedChange={(checked) => 
+                          setFormData(prev => ({ ...prev, termsAccepted: !!checked }))
+                        }
+                      />
+                      <Label htmlFor="terms">I agree to the terms and conditions</Label>
                     </div>
                     <div className="flex justify-between">
                       <Button variant="outline" onClick={() => setCurrentStep(3)}>
@@ -494,7 +519,13 @@ const SignupWizard = () => {
                 </motion.div>
               )}
               {currentStep === 5 && (
-                <ConfirmationPage email={formData.email} />
+                <ConfirmationPage 
+                  type="success"
+                  onBackToHome={() => navigate('/')}
+                  onContinueToSignIn={() => navigate('/auth')}
+                  onResendConfirmation={() => {}}
+                  email={formData.email}
+                />
               )}
             </AnimatePresence>
           </CardContent>
