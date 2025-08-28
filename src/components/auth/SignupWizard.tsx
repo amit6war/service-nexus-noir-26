@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -57,6 +56,9 @@ interface FormData {
   hourlyRate?: string;
   emergencyServices?: boolean;
   termsAccepted: boolean;
+  gender?: string;
+  fullName?: string;
+  location?: string;
 }
 
 const initialFormData: FormData = {
@@ -74,6 +76,9 @@ const initialFormData: FormData = {
   bio: '',
   services: [],
   termsAccepted: false,
+  gender: '',
+  fullName: '',
+  location: '',
 };
 
 const serviceCategories = [
@@ -128,6 +133,10 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [licenseFile, setLicenseFile] = useState<File | null>(null);
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [additionalFile, setAdditionalFile] = useState<File | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -165,6 +174,42 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
       }
       return { ...prev, services: newServices };
     });
+  };
+
+  const handleGenderChange = (gender: string) => {
+    setFormData(prev => ({ ...prev, gender }));
+  };
+
+  const handleUseCurrentLocation = () => {
+    setLocating(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          // In a real app, you'd reverse geocode this to get the address
+          setFormData(prev => ({
+            ...prev,
+            location: `${position.coords.latitude}, ${position.coords.longitude}`
+          }));
+          setLocating(false);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          setLocating(false);
+          toast({
+            title: "Location Error",
+            description: "Unable to get your current location.",
+            variant: "destructive",
+          });
+        }
+      );
+    } else {
+      setLocating(false);
+      toast({
+        title: "Geolocation Not Supported",
+        description: "Your browser doesn't support geolocation.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAccountTypeNext = () => {
@@ -249,7 +294,7 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
         first_name: formData.firstName,
         last_name: formData.lastName,
         phone: formData.phone,
-        role: formData.accountType === 'provider' ? 'customer' as const : 'customer' as const, // Use 'customer' as default, will be updated to 'provider' after verification
+        role: formData.accountType === 'provider' ? 'provider' as const : 'customer' as const, // Use 'customer' as default, will be updated to 'provider' after verification
         address_line_1: formData.address,
         city: formData.city,
         state: formData.state,
@@ -363,14 +408,20 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
                 <Step2
                   formData={{
                     fullName: `${formData.firstName} ${formData.lastName}`,
-                    gender: '',
-                    location: `${formData.city}, ${formData.state}`
+                    gender: formData.gender || '',
+                    location: formData.location || `${formData.city}, ${formData.state}`
                   }}
-                  handleChange={handleChange}
-                  handleServiceChange={handleServiceChange}
-                  serviceCategories={serviceCategories}
-                  handleNext={handlePersonalInfoNext}
-                  handleBack={() => setCurrentStep(1)}
+                  selectedRole={formData.accountType === 'provider' ? 'provider' : 'customer'}
+                  locating={locating}
+                  licenseFile={licenseFile}
+                  idFile={idFile}
+                  additionalFile={additionalFile}
+                  onInputChange={handleChange}
+                  onGenderChange={handleGenderChange}
+                  onUseCurrentLocation={handleUseCurrentLocation}
+                  onLicenseFileChange={setLicenseFile}
+                  onIdFileChange={setIdFile}
+                  onAdditionalFileChange={setAdditionalFile}
                 />
               )}
               {currentStep === 3 && (
