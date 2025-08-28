@@ -1,20 +1,21 @@
-import React, { useEffect } from 'react';
+
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, User, Trash2, ShoppingCart as CartIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useCart } from '@/hooks/useCart';
+import { useProductionCart } from '@/hooks/useProductionCart';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 
-interface CartSectionProps {
+interface ProductionCartSectionProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const CartSection: React.FC<CartSectionProps> = ({ isOpen, onClose }) => {
-  const { items, removeItem, getTotalPrice, clearCart, itemCount, loading } = useCart();
+const ProductionCartSection: React.FC<ProductionCartSectionProps> = ({ isOpen, onClose }) => {
+  const { items, removeItem, getTotalPrice, clearCart, itemCount, loading } = useProductionCart();
   const navigate = useNavigate();
 
   const handleProceedToCheckout = () => {
@@ -212,4 +213,4 @@ const CartSection: React.FC<CartSectionProps> = ({ isOpen, onClose }) => {
   );
 };
 
-export default CartSection;
+export default ProductionCartSection;

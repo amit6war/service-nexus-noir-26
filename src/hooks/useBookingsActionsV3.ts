@@ -1,8 +1,9 @@
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import type { CartItem } from '@/hooks/useCart';
+import type { CartItem } from '@/hooks/useProductionCart';
 
 interface CreateBookingsParams {
   items: CartItem[];

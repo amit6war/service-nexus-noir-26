@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { User, Calendar, Heart, ShoppingCart, Star, Clock, MapPin, Bell, LogOut, DollarSign, Menu, X } from 'lucide-react';
@@ -7,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useServices } from '@/hooks/useServices';
-import { useCart } from '@/hooks/useCart';
+import { useProductionCart } from '@/hooks/useProductionCart';
 import ServiceProviderFlow from '@/components/ServiceProviderFlow';
-import CartSection from '@/components/CartSection';
+import ProductionCartSection from '@/components/ProductionCartSection';
 import ProfileSettings from '@/components/ProfileSettings';
 import MyBookings from '@/components/MyBookings';
 import AmountSection from '@/components/AmountSection';
@@ -24,7 +25,7 @@ const CustomerDashboard = () => {
   
   const { user, signOut } = useAuth();
   const { services, loading, error } = useServices();
-  const { itemCount, loading: cartLoading } = useCart();
+  const { itemCount, loading: cartLoading } = useProductionCart();
   const isMobile = useIsMobile();
 
   // Handle URL parameters and state for tab switching
@@ -362,7 +363,7 @@ const CustomerDashboard = () => {
       </div>
 
       {/* Cart Section */}
-      <CartSection isOpen={showCart} onClose={() => setShowCart(false)} />
+      <ProductionCartSection isOpen={showCart} onClose={() => setShowCart(false)} />
     </div>
   );
 };

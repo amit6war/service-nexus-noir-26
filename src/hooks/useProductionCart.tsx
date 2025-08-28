@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,14 +23,13 @@ export interface CartItem {
   provider_avatar_url?: string;
 }
 
-export const useCart = () => {
+export const useProductionCart = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const mountedRef = useRef(true);
 
-  // Load cart data from database
+  // Load cart from Supabase
   const loadCart = useCallback(async () => {
     if (!user?.id) {
       setItems([]);
@@ -46,30 +45,20 @@ export const useCart = () => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-
-      if (mountedRef.current) {
-        setItems(data || []);
-      }
+      setItems(data || []);
     } catch (error) {
-      console.error('❌ Error loading cart:', error);
+      console.error('Error loading cart:', error);
     } finally {
-      if (mountedRef.current) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, [user?.id]);
 
   // Initialize cart
   useEffect(() => {
-    mountedRef.current = true;
     loadCart();
-
-    return () => {
-      mountedRef.current = false;
-    };
   }, [loadCart]);
 
-  // Add item to cart with instant UI update
+  // Add item to cart - INSTANT UI UPDATE
   const addItem = useCallback(async (itemData: Omit<CartItem, 'id'>) => {
     if (!user?.id) {
       toast({
@@ -87,24 +76,21 @@ export const useCart = () => {
 
     if (exists) {
       toast({
-        title: "Item Already in Cart",
+        title: "Already in Cart",
         description: "This service is already in your cart.",
         variant: "destructive",
       });
       return false;
     }
 
-    // Create optimistic item with temporary ID
-    const tempId = `temp_${Date.now()}_${Math.random()}`;
-    const optimisticItem: CartItem = {
-      id: tempId,
-      ...itemData
-    };
+    // Create optimistic item
+    const tempId = `temp_${Date.now()}`;
+    const optimisticItem: CartItem = { id: tempId, ...itemData };
 
-    // INSTANT UI update - users see this immediately
-    setItems(prevItems => [...prevItems, optimisticItem]);
+    // INSTANT UI UPDATE
+    setItems(prev => [...prev, optimisticItem]);
 
-    // Show success immediately
+    // Show success toast immediately
     toast({
       title: "Added to Cart",
       description: `${itemData.service_name} added successfully.`,
@@ -124,16 +110,16 @@ export const useCart = () => {
       if (error) throw error;
 
       // Replace optimistic item with real item
-      setItems(prevItems => 
-        prevItems.map(item => item.id === tempId ? data : item)
+      setItems(prev => 
+        prev.map(item => item.id === tempId ? data : item)
       );
 
       return true;
     } catch (error) {
-      console.error('❌ Add item failed:', error);
+      console.error('Add item failed:', error);
       
       // Rollback on error
-      setItems(prevItems => prevItems.filter(item => item.id !== tempId));
+      setItems(prev => prev.filter(item => item.id !== tempId));
       
       toast({
         title: "Error",
@@ -145,17 +131,17 @@ export const useCart = () => {
     }
   }, [user?.id, items, toast]);
 
-  // Remove item from cart with instant UI update
+  // Remove item - INSTANT UI UPDATE
   const removeItem = useCallback(async (itemId: string) => {
     if (!user?.id) return false;
 
     const itemToRemove = items.find(item => item.id === itemId);
     if (!itemToRemove) return false;
 
-    // INSTANT UI update
-    setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+    // INSTANT UI UPDATE
+    setItems(prev => prev.filter(item => item.id !== itemId));
 
-    // Show success immediately
+    // Show success toast immediately
     toast({
       title: "Removed from Cart",
       description: `${itemToRemove.service_name} removed successfully.`,
@@ -171,10 +157,10 @@ export const useCart = () => {
       if (error) throw error;
       return true;
     } catch (error) {
-      console.error('❌ Remove item failed:', error);
+      console.error('Remove item failed:', error);
       
       // Rollback on error
-      setItems(prevItems => [...prevItems, itemToRemove]);
+      setItems(prev => [...prev, itemToRemove]);
       
       toast({
         title: "Error",
@@ -186,13 +172,13 @@ export const useCart = () => {
     }
   }, [user?.id, items, toast]);
 
-  // Clear entire cart with instant UI update
+  // Clear cart - INSTANT UI UPDATE
   const clearCart = useCallback(async () => {
     if (!user?.id) return false;
 
     const originalItems = [...items];
 
-    // INSTANT UI update
+    // INSTANT UI UPDATE
     setItems([]);
 
     toast({
@@ -209,7 +195,7 @@ export const useCart = () => {
       if (error) throw error;
       return true;
     } catch (error) {
-      console.error('❌ Clear cart failed:', error);
+      console.error('Clear cart failed:', error);
       
       // Rollback on error
       setItems(originalItems);
@@ -228,15 +214,13 @@ export const useCart = () => {
     return items.reduce((sum, item) => sum + item.final_price, 0);
   }, [items]);
 
-  const itemCount = items.length;
-
   return {
     items,
     addItem,
     removeItem,
     clearCart,
     getTotalPrice,
-    itemCount,
+    itemCount: items.length,
     loading,
     refreshCart: loadCart
   };
