@@ -189,6 +189,147 @@ export type Database = {
           },
         ]
       }
+      cart_items: {
+        Row: {
+          base_price: number
+          category: string | null
+          created_at: string | null
+          discount_amount: number | null
+          duration_minutes: number
+          expires_at: string | null
+          final_price: number
+          id: string
+          is_premium: boolean | null
+          location_address: string | null
+          location_lat: number | null
+          location_lng: number | null
+          metadata: Json | null
+          notes: string | null
+          provider_avatar_url: string | null
+          provider_id: string
+          provider_name: string
+          provider_rating: number | null
+          provider_review_count: number | null
+          service_description: string | null
+          service_id: string
+          service_name: string
+          slot_end_time: string | null
+          slot_id: string | null
+          slot_start_time: string | null
+          subcategory: string | null
+          tax_amount: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          base_price: number
+          category?: string | null
+          created_at?: string | null
+          discount_amount?: number | null
+          duration_minutes: number
+          expires_at?: string | null
+          final_price: number
+          id?: string
+          is_premium?: boolean | null
+          location_address?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
+          metadata?: Json | null
+          notes?: string | null
+          provider_avatar_url?: string | null
+          provider_id: string
+          provider_name: string
+          provider_rating?: number | null
+          provider_review_count?: number | null
+          service_description?: string | null
+          service_id: string
+          service_name: string
+          slot_end_time?: string | null
+          slot_id?: string | null
+          slot_start_time?: string | null
+          subcategory?: string | null
+          tax_amount?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          base_price?: number
+          category?: string | null
+          created_at?: string | null
+          discount_amount?: number | null
+          duration_minutes?: number
+          expires_at?: string | null
+          final_price?: number
+          id?: string
+          is_premium?: boolean | null
+          location_address?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
+          metadata?: Json | null
+          notes?: string | null
+          provider_avatar_url?: string | null
+          provider_id?: string
+          provider_name?: string
+          provider_rating?: number | null
+          provider_review_count?: number | null
+          service_description?: string | null
+          service_id?: string
+          service_name?: string
+          slot_end_time?: string | null
+          slot_id?: string | null
+          slot_start_time?: string | null
+          subcategory?: string | null
+          tax_amount?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cart_metadata: {
+        Row: {
+          created_at: string | null
+          currency: string | null
+          id: string
+          last_activity: string | null
+          session_id: string | null
+          total_amount: number | null
+          total_items: number | null
+          total_items_added: number | null
+          total_items_removed: number | null
+          updated_at: string | null
+          user_id: string
+          version: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          last_activity?: string | null
+          session_id?: string | null
+          total_amount?: number | null
+          total_items?: number | null
+          total_items_added?: number | null
+          total_items_removed?: number | null
+          updated_at?: string | null
+          user_id: string
+          version?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          last_activity?: string | null
+          session_id?: string | null
+          total_amount?: number | null
+          total_items?: number | null
+          total_items_added?: number | null
+          total_items_removed?: number | null
+          updated_at?: string | null
+          user_id?: string
+          version?: string | null
+        }
+        Relationships: []
+      }
       disputes: {
         Row: {
           admin_id: string | null
@@ -429,7 +570,10 @@ export type Database = {
           created_at: string
           currency: string | null
           customer_id: string | null
+          failure_reason: string | null
+          gateway_response: Json | null
           id: string
+          idempotency_key: string | null
           payment_intent_id: string | null
           payment_method: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
@@ -439,8 +583,10 @@ export type Database = {
           provider_user_id: string | null
           refund_amount: number | null
           refund_reason: string | null
+          retry_count: number | null
           stripe_charge_id: string | null
           stripe_session_id: string | null
+          updated_at: string | null
         }
         Insert: {
           amount: number
@@ -448,7 +594,10 @@ export type Database = {
           created_at?: string
           currency?: string | null
           customer_id?: string | null
+          failure_reason?: string | null
+          gateway_response?: Json | null
           id?: string
+          idempotency_key?: string | null
           payment_intent_id?: string | null
           payment_method?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
@@ -458,8 +607,10 @@ export type Database = {
           provider_user_id?: string | null
           refund_amount?: number | null
           refund_reason?: string | null
+          retry_count?: number | null
           stripe_charge_id?: string | null
           stripe_session_id?: string | null
+          updated_at?: string | null
         }
         Update: {
           amount?: number
@@ -467,7 +618,10 @@ export type Database = {
           created_at?: string
           currency?: string | null
           customer_id?: string | null
+          failure_reason?: string | null
+          gateway_response?: Json | null
           id?: string
+          idempotency_key?: string | null
           payment_intent_id?: string | null
           payment_method?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
@@ -477,8 +631,10 @@ export type Database = {
           provider_user_id?: string | null
           refund_amount?: number | null
           refund_reason?: string | null
+          retry_count?: number | null
           stripe_charge_id?: string | null
           stripe_session_id?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1059,6 +1215,10 @@ export type Database = {
     Functions: {
       calculate_cancellation_fee: {
         Args: { booking_amount: number; booking_date: string }
+        Returns: number
+      }
+      cleanup_expired_cart_items: {
+        Args: Record<PropertyKey, never>
         Returns: number
       }
       has_role: {
