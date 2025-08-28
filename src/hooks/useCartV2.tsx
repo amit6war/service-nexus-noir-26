@@ -34,6 +34,7 @@ export const useCartV2 = () => {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const mountedRef = useRef(true);
   const lastUpdateRef = useRef<number>(0);
+  const optimisticUpdateRef = useRef<string | null>(null);
 
   console.log('🛒 useCartV2 - Current state:', { 
     itemCount: items.length, 
@@ -98,6 +99,50 @@ export const useCartV2 = () => {
     }
   }, [user?.id, toast]);
 
+  // Handle real-time updates with optimistic update protection
+  const handleRealtimeUpdate = useCallback((payload: any) => {
+    if (!mountedRef.current) return;
+
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+    
+    // Skip real-time updates if we're in the middle of an optimistic update
+    if (optimisticUpdateRef.current) {
+      console.log('🔄 Skipping real-time update during optimistic operation:', optimisticUpdateRef.current);
+      return;
+    }
+    
+    setItems(currentItems => {
+      let newItems = [...currentItems];
+      
+      switch (eventType) {
+        case 'INSERT':
+          console.log('➕ Real-time: Item added', newRecord.service_name);
+          const existsInsert = newItems.some(item => item.id === newRecord.id);
+          if (!existsInsert) {
+            newItems = [...newItems, newRecord];
+          }
+          break;
+        
+        case 'UPDATE':
+          console.log('✏️ Real-time: Item updated', newRecord.service_name);
+          newItems = newItems.map(item => 
+            item.id === newRecord.id ? newRecord : item
+          );
+          break;
+        
+        case 'DELETE':
+          console.log('➖ Real-time: Item removed', oldRecord?.service_name || oldRecord?.id);
+          newItems = newItems.filter(item => item.id !== oldRecord.id);
+          break;
+        
+        default:
+          return currentItems;
+      }
+      
+      return newItems;
+    });
+  }, []);
+
   // Set up real-time subscription
   const setupRealtimeSubscription = useCallback(() => {
     if (!user?.id || channelRef.current) return;
@@ -125,7 +170,6 @@ export const useCartV2 = () => {
           console.log('✅ Real-time subscription active');
         } else if (status === 'CHANNEL_ERROR') {
           console.error('❌ Real-time subscription failed');
-          // Retry subscription after a delay
           setTimeout(() => {
             if (mountedRef.current && user?.id) {
               cleanupRealtimeSubscription();
@@ -136,46 +180,7 @@ export const useCartV2 = () => {
       });
 
     channelRef.current = channel;
-  }, [user?.id]);
-
-  // Handle real-time updates
-  const handleRealtimeUpdate = useCallback((payload: any) => {
-    if (!mountedRef.current) return;
-
-    const { eventType, new: newRecord, old: oldRecord } = payload;
-    
-    setItems(currentItems => {
-      let newItems = [...currentItems];
-      
-      switch (eventType) {
-        case 'INSERT':
-          console.log('➕ Real-time: Item added', newRecord.service_name);
-          // Check if item already exists to prevent duplicates
-          const existsInsert = newItems.some(item => item.id === newRecord.id);
-          if (!existsInsert) {
-            newItems = [...newItems, newRecord];
-          }
-          break;
-        
-        case 'UPDATE':
-          console.log('✏️ Real-time: Item updated', newRecord.service_name);
-          newItems = newItems.map(item => 
-            item.id === newRecord.id ? newRecord : item
-          );
-          break;
-        
-        case 'DELETE':
-          console.log('➖ Real-time: Item removed', oldRecord?.service_name || oldRecord?.id);
-          newItems = newItems.filter(item => item.id !== oldRecord.id);
-          break;
-        
-        default:
-          return currentItems;
-      }
-      
-      return newItems;
-    });
-  }, []);
+  }, [user?.id, handleRealtimeUpdate, cleanupRealtimeSubscription]);
 
   // Initialize cart and set up real-time subscriptions
   useEffect(() => {
@@ -194,10 +199,7 @@ export const useCartV2 = () => {
         setLoading(true);
         console.log('🚀 Initializing cart for user:', user.id);
 
-        // Load existing cart items
         await loadCartData(true);
-        
-        // Set up real-time subscription after loading
         setupRealtimeSubscription();
         
       } catch (error) {
@@ -235,35 +237,51 @@ export const useCartV2 = () => {
       return false;
     }
 
+    // Check for existing items before making API call
+    const existingItem = items.find(
+      item => item.service_id === itemData.service_id && item.provider_id === itemData.provider_id
+    );
+
+    if (existingItem) {
+      toast({
+        title: "Item Already in Cart",
+        description: "This service from this provider is already in your cart.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const serviceExists = items.find(item => item.service_id === itemData.service_id);
+    if (serviceExists) {
+      toast({
+        title: "Service Already Selected",
+        description: "You can only select one provider per service. Remove the existing one first.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     try {
       setSyncing(true);
       console.log('🔄 Adding item to cart:', itemData.service_name);
 
-      // Check if item already exists (optimistic check)
-      const existingItem = items.find(
-        item => item.service_id === itemData.service_id && item.provider_id === itemData.provider_id
-      );
+      // Create temporary item for optimistic update
+      const tempId = `temp_${Date.now()}`;
+      const optimisticItem: CartItem = {
+        id: tempId,
+        ...itemData
+      };
 
-      if (existingItem) {
-        toast({
-          title: "Item Already in Cart",
-          description: "This service from this provider is already in your cart.",
-          variant: "destructive",
-        });
-        return false;
+      // Set optimistic update flag
+      optimisticUpdateRef.current = 'add';
+
+      // Immediately update UI (optimistic update)
+      if (mountedRef.current) {
+        setItems(currentItems => [...currentItems, optimisticItem]);
+        console.log('⚡ Optimistic add: Item added to UI immediately');
       }
 
-      // Check if service already exists with different provider
-      const serviceExists = items.find(item => item.service_id === itemData.service_id);
-      if (serviceExists) {
-        toast({
-          title: "Service Already Selected",
-          description: "You can only select one provider per service. Remove the existing one first.",
-          variant: "destructive",
-        });
-        return false;
-      }
-
+      // Make API call
       const { data, error } = await supabase
         .from('cart_items')
         .insert({
@@ -275,23 +293,27 @@ export const useCartV2 = () => {
 
       if (error) {
         console.error('❌ Error adding item to cart:', error);
+        // Revert optimistic update on error
+        if (mountedRef.current) {
+          setItems(currentItems => currentItems.filter(item => item.id !== tempId));
+        }
         throw error;
       }
 
       console.log('✅ Item added to cart successfully:', data);
+      
+      // Replace optimistic item with real item
+      if (mountedRef.current) {
+        setItems(currentItems => 
+          currentItems.map(item => item.id === tempId ? data : item)
+        );
+        console.log('🔄 Replaced optimistic item with real item');
+      }
+
       toast({
         title: "Added to Cart",
         description: `${itemData.service_name} has been added to your cart.`,
       });
-
-      // The real-time subscription will handle the UI update
-      // But we can also optimistically update for immediate feedback
-      if (mountedRef.current) {
-        setItems(currentItems => {
-          const exists = currentItems.some(item => item.id === data.id);
-          return exists ? currentItems : [...currentItems, data];
-        });
-      }
 
       return true;
     } catch (error) {
@@ -304,18 +326,33 @@ export const useCartV2 = () => {
       return false;
     } finally {
       setSyncing(false);
+      // Clear optimistic update flag after a delay to allow real-time updates
+      setTimeout(() => {
+        optimisticUpdateRef.current = null;
+      }, 500);
     }
   }, [user?.id, items, toast]);
 
   const removeItem = useCallback(async (itemId: string) => {
     if (!user?.id) return false;
 
+    const itemToRemove = items.find(item => item.id === itemId);
+    if (!itemToRemove) return false;
+
     try {
       setSyncing(true);
       console.log('🔄 Removing item from cart:', itemId);
 
-      const itemToRemove = items.find(item => item.id === itemId);
+      // Set optimistic update flag
+      optimisticUpdateRef.current = 'remove';
 
+      // Immediately update UI (optimistic update)
+      if (mountedRef.current) {
+        setItems(currentItems => currentItems.filter(item => item.id !== itemId));
+        console.log('⚡ Optimistic remove: Item removed from UI immediately');
+      }
+
+      // Make API call
       const { error } = await supabase
         .from('cart_items')
         .delete()
@@ -324,22 +361,19 @@ export const useCartV2 = () => {
 
       if (error) {
         console.error('❌ Error removing item:', error);
+        // Revert optimistic update on error
+        if (mountedRef.current) {
+          setItems(currentItems => [...currentItems, itemToRemove]);
+        }
         throw error;
       }
 
       console.log('✅ Item removed successfully');
-      
-      // Optimistically update UI immediately
-      if (mountedRef.current) {
-        setItems(currentItems => currentItems.filter(item => item.id !== itemId));
-      }
 
-      if (itemToRemove) {
-        toast({
-          title: "Removed from Cart",
-          description: `${itemToRemove.service_name} has been removed from your cart.`,
-        });
-      }
+      toast({
+        title: "Removed from Cart",
+        description: `${itemToRemove.service_name} has been removed from your cart.`,
+      });
 
       return true;
     } catch (error) {
@@ -358,15 +392,30 @@ export const useCartV2 = () => {
       return false;
     } finally {
       setSyncing(false);
+      // Clear optimistic update flag after a delay
+      setTimeout(() => {
+        optimisticUpdateRef.current = null;
+      }, 500);
     }
   }, [user?.id, items, toast, loadCartData]);
 
   const clearCart = useCallback(async () => {
     if (!user?.id) return false;
 
+    const currentItems = [...items];
+
     try {
       setSyncing(true);
       console.log('🔄 Clearing cart for user:', user.id);
+
+      // Set optimistic update flag
+      optimisticUpdateRef.current = 'clear';
+
+      // Immediately update UI (optimistic update)
+      if (mountedRef.current) {
+        setItems([]);
+        console.log('⚡ Optimistic clear: Cart cleared from UI immediately');
+      }
 
       const { error } = await supabase
         .from('cart_items')
@@ -375,15 +424,14 @@ export const useCartV2 = () => {
 
       if (error) {
         console.error('❌ Error clearing cart:', error);
+        // Revert optimistic update on error
+        if (mountedRef.current) {
+          setItems(currentItems);
+        }
         throw error;
       }
 
       console.log('✅ Cart cleared successfully');
-      
-      // Immediately update UI
-      if (mountedRef.current) {
-        setItems([]);
-      }
 
       toast({
         title: "Cart Cleared",
@@ -401,8 +449,12 @@ export const useCartV2 = () => {
       return false;
     } finally {
       setSyncing(false);
+      // Clear optimistic update flag after a delay
+      setTimeout(() => {
+        optimisticUpdateRef.current = null;
+      }, 500);
     }
-  }, [user?.id, toast]);
+  }, [user?.id, items, toast]);
 
   const updateCartMetadata = useCallback(async () => {
     if (!user?.id) return;
