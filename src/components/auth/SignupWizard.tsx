@@ -1,405 +1,317 @@
-
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Loader } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
-import ProgressIndicator from './ProgressIndicator';
+import { 
+  User, 
+  MapPin, 
+  Briefcase, 
+  CheckCircle, 
+  ArrowRight, 
+  ArrowLeft,
+  Phone,
+  Mail,
+  Calendar,
+  Star,
+  Wrench,
+  Scissors,
+  Car,
+  Home,
+  Paintbrush,
+  Users
+} from 'lucide-react';
 import Step1 from './Step1';
 import Step2 from './Step2';
+import ConfirmationPage from './ConfirmationPage';
+import ProgressIndicator from './ProgressIndicator';
 
-interface SignupWizardProps {
-  onBack: () => void;
-  onSuccess: () => void;
+interface FormData {
+  accountType: 'customer' | 'provider' | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  password?: string;
+  confirmPassword?: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+  bio: string;
+  businessName?: string;
+  experience?: string;
+  services: string[];
+  hourlyRate?: string;
+  emergencyServices?: boolean;
+  termsAccepted: boolean;
 }
 
-const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
-  const { signUp } = useAuth();
-  const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [locating, setLocating] = useState(false);
-  
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    password: '',
-    gender: '',
-    location: ''
-  });
-  
-  const [selectedRole, setSelectedRole] = useState<'customer' | 'provider'>('customer');
-  const [licenseFile, setLicenseFile] = useState<File | null>(null);
-  const [idFile, setIdFile] = useState<File | null>(null);
-  const [additionalFile, setAdditionalFile] = useState<File | null>(null);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+const initialFormData: FormData = {
+  accountType: null,
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  dateOfBirth: '',
+  address: '',
+  city: '',
+  state: '',
+  zipCode: '',
+  country: 'US',
+  bio: '',
+  services: [],
+  termsAccepted: false,
+};
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
+const serviceCategories = [
+  {
+    name: 'Home Repair',
+    icon: Home,
+    subcategories: ['Plumbing', 'Electrical', 'Carpentry', 'Painting']
+  },
+  {
+    name: 'Automotive',
+    icon: Car,
+    subcategories: ['Mechanic', 'Detailing', 'Towing']
+  },
+  {
+    name: 'Beauty & Personal Care',
+    icon: Scissors,
+    subcategories: ['Hair Styling', 'Makeup', 'Nail Care']
+  },
+  {
+    name: 'Handyman Services',
+    icon: Wrench,
+    subcategories: ['General Repairs', 'Installation', 'Assembly']
+  },
+  {
+    name: 'Cleaning Services',
+    icon: Paintbrush,
+    subcategories: ['House Cleaning', 'Office Cleaning', 'Deep Cleaning']
+  },
+  {
+    name: 'Pet Care',
+    icon: Star,
+    subcategories: ['Grooming', 'Walking', 'Sitting']
+  },
+  {
+    name: 'Tutoring',
+    icon: Users,
+    subcategories: ['Math', 'Science', 'English']
+  },
+  {
+    name: 'Event Planning',
+    icon: Calendar,
+    subcategories: ['Catering', 'Decor', 'Music']
+  }
+];
+
+const SignupWizard = () => {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const progress = currentStep === 1 ? 20 : 
+                   currentStep === 2 ? 40 : 
+                   currentStep === 3 ? 60 :
+                   currentStep === 4 ? 80 : 100;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleServiceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value, checked } = e.target;
+    setFormData(prev => {
+      let newServices = [...prev.services];
+      if (checked) {
+        newServices.push(value);
+      } else {
+        newServices = newServices.filter(service => service !== value);
+      }
+      return { ...prev, services: newServices };
     });
   };
 
-  // Check for duplicate email or phone
-  const checkDuplicates = async (email: string, phone: string) => {
-    try {
-      const { data: existingProfiles, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .or(`phone.eq.${phone}`);
-
-      if (error) {
-        console.error('Error checking duplicates:', error);
-        return false;
-      }
-
-      // Check if phone exists in profiles
-      if (existingProfiles && existingProfiles.length > 0) {
-        toast({
-          title: "Account Already Exists",
-          description: "This phone number is already registered. Please use a different one or sign in.",
-          variant: "destructive",
-        });
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Error checking duplicates:', error);
-      return false;
-    }
-  };
-
-  // Use local geocoding server for reverse geocoding with Google Maps API
-  const reverseGeocode = async (latitude: number, longitude: number) => {
-    try {
-      const response = await fetch('http://localhost:3001/reverse-geocode', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ latitude, longitude })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Reverse geocoding error:', errorData);
-        throw new Error(errorData.error || 'Failed to reverse geocode');
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Reverse geocoding error:', error);
-      
-      // Fallback to coordinates if API fails
-      return {
-        formattedAddress: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-        coordinates: { latitude, longitude },
-        components: {},
-        isComplete: false
-      };
-    }
-  };
-
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast({ 
-        title: 'Geolocation not supported',
-        description: 'Your browser does not support geolocation.',
-        variant: 'destructive' 
+  const handleAccountTypeNext = () => {
+    if (!formData.accountType) {
+      toast({
+        title: "Selection Required",
+        description: "Please select an account type to continue.",
+        variant: "destructive",
       });
       return;
     }
-    
-    setLocating(true);
-    
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        
-        console.log("Latitude:", latitude);
-        console.log("Longitude:", longitude);
-        console.log("Accuracy (meters):", accuracy);
-        
-        try {
-          console.log('Calling reverse geocode with coordinates:', latitude, longitude);
-          const addressData = await reverseGeocode(latitude, longitude);
-          console.log('Address data received:', addressData);
-          
-          setFormData(prev => ({ 
-            ...prev, 
-            location: addressData.formattedAddress 
-          }));
-          setLocating(false);
-          
-          toast({ 
-            title: 'Location detected',
-            description: `Address: ${addressData.formattedAddress} (±${accuracy.toFixed(0)}m accuracy)`
-          });
-        } catch (error) {
-          console.error('Reverse geocoding failed:', error);
-          setFormData(prev => ({ 
-            ...prev, 
-            location: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` 
-          }));
-          setLocating(false);
-          toast({ 
-            title: 'Location detected',
-            description: `Coordinates: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (±${accuracy.toFixed(0)}m). Address lookup failed.`
-          });
-        }
-      },
-      (error) => {
-        console.error("Error getting location:", error);
-        setLocating(false);
-        let errorMessage = 'Unable to get your current location. Please enter it manually.';
-        
-        if (error.code === error.PERMISSION_DENIED) {
-          errorMessage = 'Location access denied. Please enable location permission and try again.';
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          errorMessage = 'Location information unavailable. Please check your GPS and internet connection.';
-        } else if (error.code === error.TIMEOUT) {
-          errorMessage = 'Location request timed out. Please try again.';
-        }
-        
-        toast({ 
-          title: 'Location error',
-          description: errorMessage,
-          variant: 'destructive' 
-        });
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
+    setCurrentStep(2);
   };
 
-  const uploadFile = async (file: File, folder: string) => {
+  const handlePersonalInfoNext = async () => {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.accountType === 'provider' && (!formData.businessName || !formData.experience || formData.services.length === 0)) {
+      toast({
+        title: "Provider Information Required",
+        description: "Please complete all provider information fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCurrentStep(3);
+  };
+
+  const handleLocationNext = () => {
+    if (!formData.address || !formData.city || !formData.state || !formData.zipCode) {
+      toast({
+        title: "Address Required",
+        description: "Please complete your address information.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setCurrentStep(4);
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${folder}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('verification_documents')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      return filePath;
-    } catch (error) {
-      console.error('File upload error:', error);
-      throw error;
-    }
-  };
-
-  const validateStep1 = async () => {
-    if (!formData.email || !formData.phone || !formData.password) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
+      // Sign up the user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+          }
+        }
       });
-      return false;
-    }
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      toast({
-        title: "Invalid Email",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    // Basic password validation
-    if (formData.password.length < 6) {
-      toast({
-        title: "Weak Password",
-        description: "Password must be at least 6 characters long.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    // Check for duplicates
-    const hasDuplicates = await checkDuplicates(formData.email, formData.phone);
-    if (hasDuplicates) {
-      return false;
-    }
-
-    return true;
-  };
-
-  const validateStep2 = () => {
-    if (!formData.fullName || !formData.gender || !formData.location) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    // Validate required documents for service providers
-    if (selectedRole === 'provider') {
-      if (!licenseFile || !idFile) {
+      if (authError) {
+        console.error('Auth error:', authError);
         toast({
-          title: "Required Documents Missing",
-          description: "Service providers must upload both a valid license and government-issued ID.",
+          title: "Signup Failed",
+          description: authError.message,
           variant: "destructive",
         });
-        return false;
-      }
-    }
-
-    return true;
-  };
-
-  const handleNext = async () => {
-    if (currentStep === 1 && await validateStep1()) {
-      setCurrentStep(2);
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateStep2()) return;
-    
-    setIsSubmitting(true);
-
-    try {
-      // Extract first and last name from full name
-      const nameParts = formData.fullName.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-
-      const userData = {
-        first_name: firstName,
-        last_name: lastName,
-        phone: formData.phone,
-        gender: formData.gender,
-        location: formData.location
-      };
-
-      console.log('[SignupWizard] Starting signup with role:', selectedRole);
-
-      // Pass the selected role to signUp
-      const { error } = await signUp(formData.email, formData.password, userData, selectedRole);
-      
-      if (error) {
-        console.error('[SignupWizard] Signup error:', error);
-        if (error.message.includes('already registered') || error.message.includes('already exists')) {
-          toast({
-            title: "Account Already Exists",
-            description: "This email is already registered. Please log in or use a different email.",
-            variant: "destructive",
-          });
-        }
         return;
       }
 
-      console.log('[SignupWizard] Signup successful');
-
-      // Handle post-signup operations for service providers
-      if (selectedRole === 'provider') {
-        console.log('[SignupWizard] Processing provider documents...');
-        
-        // Wait a moment for the user to be created
-        setTimeout(async () => {
-          try {
-            const { data: { user: currentUser } } = await supabase.auth.getUser();
-            if (currentUser) {
-              console.log('[SignupWizard] Updating provider profile...');
-              
-              // Update profile role to pending_provider
-              await supabase
-                .from('profiles')
-                .update({ role: 'pending_provider' })
-                .eq('id', currentUser.id);
-
-              // Upload documents if provided
-              const documents = [];
-              
-              if (licenseFile) {
-                const licensePath = await uploadFile(licenseFile, 'licenses');
-                documents.push({
-                  user_id: currentUser.id,
-                  document_type: 'license',
-                  file_path: licensePath,
-                  status: 'pending'
-                });
-              }
-
-              if (idFile) {
-                const idPath = await uploadFile(idFile, 'ids');
-                documents.push({
-                  user_id: currentUser.id,
-                  document_type: 'id',
-                  file_path: idPath,
-                  status: 'pending'
-                });
-              }
-
-              if (additionalFile) {
-                const additionalPath = await uploadFile(additionalFile, 'additional');
-                documents.push({
-                  user_id: currentUser.id,
-                  document_type: 'additional',
-                  file_path: additionalPath,
-                  status: 'pending'
-                });
-              }
-
-              // Insert verification documents
-              if (documents.length > 0) {
-                await supabase
-                  .from('verification_documents')
-                  .insert(documents);
-              }
-
-              toast({
-                title: "Service Provider Registration Submitted",
-                description: "Your application is under review. You'll receive an email once approved.",
-              });
-            }
-          } catch (uploadError) {
-            console.error('Post-signup error:', uploadError);
-            toast({
-              title: "Registration Completed",
-              description: "Account created but there was an issue with document upload. Please try uploading documents after login.",
-              variant: "destructive",
-            });
-          }
-        }, 2000);
-      } else {
-        toast({
-          title: "Account Created Successfully",
-          description: "Please check your email to verify your account before signing in.",
-        });
+      if (!authData.user) {
+        throw new Error('No user data returned from signup');
       }
-        
-      onSuccess();
-    } catch (error) {
-      console.error('Form submission error:', error);
+
+      // Create profile
+      const profileData = {
+        id: authData.user.id,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.accountType === 'provider' ? 'provider' : 'customer',
+        address_line_1: formData.address,
+        city: formData.city,
+        state: formData.state,
+        postal_code: formData.zipCode,
+        country: formData.country,
+        date_of_birth: formData.dateOfBirth,
+        avatar_url: null,
+        bio: formData.bio || null,
+        preferences: null,
+        notification_settings: null,
+        privacy_settings: null,
+        verification_status: 'pending',
+        last_seen: new Date().toISOString(),
+        is_online: true,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        language: 'en',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert(profileData);
+
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        toast({
+          title: "Profile Creation Failed",
+          description: profileError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // If provider, create service provider profile
+      if (formData.accountType === 'provider') {
+        const serviceProviderData = {
+          user_id: authData.user.id,
+          business_name: formData.businessName!,
+          description: formData.bio || '',
+          years_experience: parseInt(formData.experience!) || 0,
+          hourly_rate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+          emergency_services: formData.emergencyServices || false,
+          verification_status: 'pending',
+          rating: 0,
+          total_reviews: 0,
+          service_areas: [],
+          business_hours: null,
+          availability_schedule: null,
+          portfolio_images: [],
+        };
+
+        const { error: providerError } = await supabase
+          .from('service_providers')
+          .insert(serviceProviderData);
+
+        if (providerError) {
+          console.error('Service provider creation error:', providerError);
+          toast({
+            title: "Provider Profile Creation Failed",
+            description: providerError.message,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       toast({
-        title: "Error",
+        title: "Account Created Successfully!",
+        description: "Please check your email to verify your account.",
+      });
+
+      setCurrentStep(5);
+    } catch (error) {
+      console.error('Signup error:', error);
+      toast({
+        title: "Signup Failed",
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
@@ -408,99 +320,185 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
     }
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => setTouchStartX(e.touches[0].clientX);
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX === null) return;
-    const deltaX = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(deltaX) > 60) {
-      if (deltaX < 0 && currentStep === 1) {
-        handleNext();
-      } else if (deltaX > 0 && currentStep === 2) {
-        handlePrevious();
-      }
-    }
-    setTouchStartX(null);
-  };
-
   return (
-    <div className="w-full max-w-md">
-      <ProgressIndicator currentStep={currentStep} totalSteps={2} />
-
+    <div className="min-h-screen bg-gradient-to-br from-teal/5 to-blue/5 flex items-center justify-center p-4">
       <motion.div 
-        className="card-glass min-h-[500px] shadow-xl"
-        whileHover={{ boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}
-        transition={{ duration: 0.2 }}
+        className="w-full max-w-2xl"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
       >
-        <form onSubmit={handleSubmit} className="h-full flex flex-col">
-          <div className="flex-1" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        <Card className="shadow-lg border-0">
+          <CardHeader className="pb-2 pt-6">
+            <CardTitle className="text-3xl font-bold text-center">
+              Create Your Account
+            </CardTitle>
+            <ProgressIndicator step={currentStep} />
+          </CardHeader>
+          <CardContent className="p-8">
+            <Progress value={progress} className="mb-4 h-2" />
             <AnimatePresence mode="wait">
-              {currentStep === 1 ? (
-                <Step1
-                  key="step1"
+              {currentStep === 1 && (
+                <Step1 
                   formData={formData}
-                  selectedRole={selectedRole}
-                  showPassword={showPassword}
-                  onInputChange={handleInputChange}
-                  onRoleChange={setSelectedRole}
-                  onTogglePassword={() => setShowPassword(!showPassword)}
-                />
-              ) : (
-                <Step2
-                  key="step2"
-                  formData={formData}
-                  selectedRole={selectedRole}
-                  locating={locating}
-                  licenseFile={licenseFile}
-                  idFile={idFile}
-                  additionalFile={additionalFile}
-                  onInputChange={handleInputChange}
-                  onGenderChange={(gender) => setFormData({ ...formData, gender })}
-                  onUseCurrentLocation={handleUseCurrentLocation}
-                  onLicenseFileChange={setLicenseFile}
-                  onIdFileChange={setIdFile}
-                  onAdditionalFileChange={setAdditionalFile}
+                  handleChange={handleChange}
+                  handleNext={handleAccountTypeNext}
                 />
               )}
+              {currentStep === 2 && (
+                <Step2
+                  formData={formData}
+                  handleChange={handleChange}
+                  handleServiceChange={handleServiceChange}
+                  serviceCategories={serviceCategories}
+                  handleNext={handlePersonalInfoNext}
+                  handleBack={() => setCurrentStep(1)}
+                />
+              )}
+              {currentStep === 3 && (
+                <motion.div
+                  key="step3"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="address">Address</Label>
+                        <Input 
+                          type="text" 
+                          id="address" 
+                          name="address" 
+                          value={formData.address} 
+                          onChange={handleChange} 
+                          placeholder="123 Main St"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="city">City</Label>
+                        <Input 
+                          type="text" 
+                          id="city" 
+                          name="city" 
+                          value={formData.city} 
+                          onChange={handleChange} 
+                          placeholder="Anytown"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="state">State</Label>
+                        <Input 
+                          type="text" 
+                          id="state" 
+                          name="state" 
+                          value={formData.state} 
+                          onChange={handleChange} 
+                          placeholder="CA"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="zipCode">Zip Code</Label>
+                        <Input 
+                          type="text" 
+                          id="zipCode" 
+                          name="zipCode" 
+                          value={formData.zipCode} 
+                          onChange={handleChange} 
+                          placeholder="90210"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="country">Country</Label>
+                      <Input 
+                        type="text" 
+                        id="country" 
+                        name="country" 
+                        value={formData.country} 
+                        onChange={handleChange} 
+                        placeholder="US"
+                        disabled
+                      />
+                    </div>
+                    <div className="flex justify-between">
+                      <Button variant="outline" onClick={() => setCurrentStep(2)}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back
+                      </Button>
+                      <Button onClick={handleLocationNext}>
+                        Next
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              {currentStep === 4 && (
+                <motion.div
+                  key="step4"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="password">Password</Label>
+                      <Input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        onChange={handleChange} 
+                        placeholder="Enter password"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="confirmPassword">Confirm Password</Label>
+                      <Input 
+                        type="password" 
+                        id="confirmPassword" 
+                        name="confirmPassword" 
+                        onChange={handleChange} 
+                        placeholder="Confirm password"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="bio">Bio</Label>
+                      <Textarea
+                        id="bio"
+                        name="bio"
+                        value={formData.bio}
+                        onChange={handleChange}
+                        placeholder="Tell us a little about yourself"
+                      />
+                    </div>
+                    <div>
+                      <Checkbox id="terms" name="termsAccepted" checked={formData.termsAccepted} onChange={handleChange} />
+                      <Label htmlFor="terms" className="ml-2">I agree to the terms and conditions</Label>
+                    </div>
+                    <div className="flex justify-between">
+                      <Button variant="outline" onClick={() => setCurrentStep(3)}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back
+                      </Button>
+                      <Button disabled={isSubmitting} onClick={handleSubmit}>
+                        {isSubmitting ? "Submitting..." : "Create Account"}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              {currentStep === 5 && (
+                <ConfirmationPage email={formData.email} />
+              )}
             </AnimatePresence>
-          </div>
-
-          <div className="flex justify-between items-center mt-8 pt-6 border-t border-border">
-            <motion.button
-              type="button"
-              onClick={currentStep === 1 ? onBack : handlePrevious}
-              className="btn-ghost flex items-center gap-2 rounded-lg"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <ArrowLeft className="w-4 h-4" />
-              {currentStep === 1 ? 'Back' : 'Previous'}
-            </motion.button>
-
-            {currentStep === 1 ? (
-              <motion.button
-                type="button"
-                onClick={handleNext}
-                className="btn-hero flex items-center gap-2 rounded-lg shadow-lg"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Next
-                <ArrowRight className="w-4 h-4" />
-              </motion.button>
-            ) : (
-              <motion.button
-                type="submit"
-                disabled={isSubmitting}
-                className="btn-hero disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 rounded-lg shadow-lg"
-                whileHover={{ scale: isSubmitting ? 1 : 1.05 }}
-                whileTap={{ scale: isSubmitting ? 1 : 0.95 }}
-              >
-                {isSubmitting && <Loader className="w-4 h-4 animate-spin" />}
-                Create Account
-              </motion.button>
-            )}
-          </div>
-        </form>
+          </CardContent>
+        </Card>
       </motion.div>
     </div>
   );

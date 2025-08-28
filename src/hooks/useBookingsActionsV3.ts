@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { CartItem } from '@/hooks/useProductionCart';
 
 interface CreateBookingData {
   customer_id: string;
@@ -14,17 +15,6 @@ interface CreateBookingData {
   service_city: string;
   service_state: string;
   service_zip?: string;
-  special_instructions?: string;
-}
-
-interface CartItem {
-  service_id: string;
-  provider_id: string;
-  service_name: string;
-  provider_name: string;
-  final_price: number;
-  duration_minutes: number;
-  slot_start_time: string | null;
   special_instructions?: string;
 }
 
@@ -115,7 +105,7 @@ export const useBookingsActionsV3 = () => {
           service_city: address.city,
           service_state: address.state,
           service_zip: address.postal_code,
-          special_instructions: item.special_instructions
+          special_instructions: item.notes
         };
 
         const booking = await createBooking(bookingData);
