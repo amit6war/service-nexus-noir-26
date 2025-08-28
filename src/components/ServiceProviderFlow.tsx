@@ -1,373 +1,150 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Star, MapPin, Clock, User, Calendar, Heart, ShoppingCart, Check } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, MessageSquare, CheckCircle, User } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { EnhancedCalendar } from '@/components/ui/enhanced-calendar';
-import { useShoppingCart } from '@/hooks/useShoppingCart';
-import { useFavorites } from '@/hooks/useFavorites';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { format, addDays, startOfDay, isSameDay, parseISO } from 'date-fns';
-
-interface Service {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  subcategory?: string;
-  base_price: number;
-  duration_minutes: number;
-  price_type: string;
-  images?: string[];
-  is_active: boolean;
-  is_featured: boolean;
-  emergency_available: boolean;
-  provider_id?: string;
-  provider_profile?: {
-    business_name: string;
-    rating: number;
-    total_reviews: number;
-    user_id: string;
-    verification_status: string;
-    description?: string;
-    years_experience?: number;
-    portfolio_images?: string[];
-  };
-}
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useServicesProviders } from '@/hooks/useServicesProviders';
+import { useProductionCart } from '@/hooks/useProductionCart';
+import { format } from 'date-fns';
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 interface ServiceProviderFlowProps {
-  selectedService: Service;
+  selectedService: any;
   onBack: () => void;
   onBookService: () => void;
-  onCartUpdate?: () => void;
 }
 
-const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
-  selectedService,
-  onBack,
-  onBookService,
-  onCartUpdate
-}) => {
-  const [currentStep, setCurrentStep] = useState<'providers' | 'booking'>('providers');
-  const [selectedProvider, setSelectedProvider] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedTime, setSelectedTime] = useState('');
-  const [specialInstructions, setSpecialInstructions] = useState('');
-  const [providers, setProviders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [existingBookings, setExistingBookings] = useState<any[]>([]);
-  const [availableDates, setAvailableDates] = useState<Date[]>([]);
-  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
-
-  const { addItem } = useShoppingCart();
-  const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
-  const { toast } = useToast();
-
-  // Handle date selection from enhanced calendar
-  const handleDateSelect = (date: Date | undefined) => {
-    setSelectedDate(date);
-    setSelectedTime(''); // Reset time when date changes
-  };
-
-  // Check if a date should be disabled
-  const isDateDisabled = (date: Date) => {
-    const today = startOfDay(new Date());
-    return date < today;
-  };
-
-  // Check if a time slot is booked
-  const isTimeSlotBooked = (date: Date, time: string) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return existingBookings.some(booking => 
-      booking.provider_id === selectedProvider?.user_id &&
-      booking.date === dateStr &&
-      booking.time === time
-    );
-  };
-
-  // Generate available dates (next 30 days)
-  useEffect(() => {
-    const dates = [];
-    for (let i = 0; i < 30; i++) {
-      dates.push(addDays(new Date(), i));
-    }
-    setAvailableDates(dates);
-  }, []);
-
-  // Generate available times
-  useEffect(() => {
-    const times = [];
-    for (let hour = 8; hour <= 18; hour++) {
-      times.push(`${hour.toString().padStart(2, '0')}:00`);
-      if (hour < 18) {
-        times.push(`${hour.toString().padStart(2, '0')}:30`);
-      }
-    }
-    setAvailableTimes(times);
-  }, []);
-
-  // Load existing bookings for the selected provider
-  useEffect(() => {
-    const loadExistingBookings = async () => {
-      if (!selectedProvider) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('bookings')
-          .select('service_date')
-          .eq('provider_user_id', selectedProvider.user_id)
-          .gte('service_date', new Date().toISOString());
-
-        if (error) {
-          console.error('Error loading bookings:', error);
-          return;
-        }
-
-        setExistingBookings(data || []);
-      } catch (error) {
-        console.error('Error loading bookings:', error);
-      }
-    };
-
-    loadExistingBookings();
-  }, [selectedProvider]);
-
-  // Load real providers from database
-  useEffect(() => {
-    const loadProviders = async () => {
-      setLoading(true);
-      
-      try {
-        // Get approved provider profiles who are associated with this service
-        const { data: providerProfiles, error } = await supabase
-          .from('provider_profiles')
-          .select(`
-            user_id,
-            business_name,
-            rating,
-            total_reviews,
-            years_experience,
-            description,
-            verification_status,
-            portfolio_images,
-            hourly_rate
-          `)
-          .eq('verification_status', 'approved')
-          .limit(10);
-
-        if (error) {
-          console.error('Error loading providers:', error);
-          toast({
-            title: 'Error',
-            description: 'Failed to load providers. Please try again.',
-            variant: 'destructive'
-          });
-          setProviders([]);
-          setLoading(false);
-          return;
-        }
-
-        // Transform the data to match the expected format
-        const transformedProviders = (providerProfiles || []).map(provider => ({
-          id: provider.user_id,
-          user_id: provider.user_id,
-          business_name: provider.business_name || 'Service Provider',
-          rating: provider.rating || 0,
-          total_reviews: provider.total_reviews || 0,
-          years_experience: provider.years_experience || 0,
-          hourly_rate: provider.hourly_rate || selectedService.base_price,
-          description: provider.description || 'Professional service provider',
-          verification_status: provider.verification_status,
-          portfolio_images: provider.portfolio_images || ['/placeholder.svg'],
-          availability_schedule: { monday: '9:00-17:00', tuesday: '9:00-17:00' }
-        }));
-
-        setProviders(transformedProviders);
-        
-      } catch (error) {
-        console.error('Error loading providers:', error);
-        toast({
-          title: 'Error',
-          description: 'An unexpected error occurred while loading providers.',
-          variant: 'destructive'
-        });
-        setProviders([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProviders();
-  }, [selectedService, toast]);
+const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({ selectedService, onBack, onBookService }) => {
+  const [selectedProvider, setSelectedProvider] = useState(null);
+  const [notes, setNotes] = useState('');
+  const [date, setDate] = React.useState<Date | undefined>(new Date());
+  const navigate = useNavigate();
+  const { providers, loading, error } = useServicesProviders(selectedService?.id);
+  const { addItem } = useProductionCart();
 
   const handleProviderSelect = (provider: any) => {
     setSelectedProvider(provider);
-    setCurrentStep('booking');
   };
 
-  const handleFavoriteToggle = async (provider: any) => {
-    const isCurrentlyFavorite = isFavorite(provider.user_id);
+  const handleAddToCart = async (provider: any) => {
+    console.log('🛒 ServiceProviderFlow: Adding to cart:', provider.business_name);
     
-    if (isCurrentlyFavorite) {
-      const success = await removeFromFavorites(provider.user_id);
-      if (success) {
-        toast({
-          title: 'Removed from Favorites',
-          description: `${provider.business_name} has been removed from your favorites.`,
-        });
-      }
-    } else {
-      const success = await addToFavorites(provider.user_id);
-      if (success) {
-        toast({
-          title: 'Added to Favorites',
-          description: `${provider.business_name} has been added to your favorites.`,
-        });
-      }
-    }
-  };
-
-  const handleAddToCart = async () => {
-    if (!selectedProvider || !selectedDate || !selectedTime) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please select a date and time for your service.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    const scheduledDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTime}:00`;
-
     const cartItem = {
       service_id: selectedService.id,
-      provider_id: selectedProvider.user_id,
-      service_title: selectedService.title,
-      provider_name: selectedProvider.business_name,
-      price: selectedProvider.hourly_rate,
+      provider_id: provider.user_id,
+      service_name: selectedService.title,
+      provider_name: provider.business_name || 'Provider',
+      base_price: selectedService.base_price,
+      final_price: selectedService.base_price,
       duration_minutes: selectedService.duration_minutes,
-      scheduled_date: scheduledDateTime,
-      special_instructions: specialInstructions
+      service_description: selectedService.description,
+      category: selectedService.category,
+      subcategory: selectedService.subcategory,
+      notes: '',
     };
 
-    const success = await addItem(cartItem, () => {
-      if (onCartUpdate) {
-        onCartUpdate();
-      }
-      onBack();
-    });
-
+    console.log('🛒 Cart item data:', cartItem);
+    
+    const success = await addItem(cartItem);
+    console.log('🛒 Add to cart result:', success);
+    
     if (success) {
-      console.log('✅ Item successfully added to cart');
+      console.log('✅ Item added successfully, showing success message');
+      // Additional success handling can be added here
     }
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={onBack} className="flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-          <h1 className="text-2xl font-bold">Loading Providers...</h1>
-        </div>
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal"></div>
-        </div>
-      </div>
-    );
-  }
+  const handleBookNow = () => {
+    if (selectedProvider) {
+      // Navigate to checkout or booking confirmation page
+      onBookService();
+      navigate('/checkout');
+    }
+  };
 
-  if (currentStep === 'providers') {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={onBack} className="flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{selectedService.title}</h1>
-            <p className="text-muted-foreground">Choose your preferred service provider</p>
+  return (
+    <div className="space-y-6">
+      {/* Back Button */}
+      <Button variant="ghost" onClick={onBack} className="gap-2">
+        <ArrowLeft className="w-5 h-5" />
+        Back to Services
+      </Button>
+
+      {/* Service Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold">{selectedService?.title}</CardTitle>
+          <CardDescription>{selectedService?.description}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="w-4 h-4" />
+              <span>{selectedService?.duration_minutes} minutes</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="w-4 h-4" />
+              <span>{selectedService?.location || 'Anywhere'}</span>
+            </div>
           </div>
-        </div>
+          <div className="text-xl font-bold text-teal">
+            Starting from ${selectedService?.base_price}
+          </div>
+        </CardContent>
+      </Card>
 
+      {/* Provider Selection */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Select a Provider</h2>
+        {loading && <p>Loading providers...</p>}
+        {error && <p className="text-red-500">Error: {error}</p>}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {providers.map((provider) => (
+          {providers?.map((provider) => (
             <motion.div
-              key={provider.id}
+              key={provider.user_id}
+              className="group"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="group"
             >
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full relative">
-                <Button
-                  onClick={() => handleFavoriteToggle(provider)}
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-4 right-4 z-10 hover:bg-red-50"
-                >
-                  <Heart 
-                    className={`w-5 h-5 ${
-                      isFavorite(provider.user_id) 
-                        ? 'fill-red-500 text-red-500' 
-                        : 'text-muted-foreground hover:text-red-500'
-                    }`} 
-                  />
-                </Button>
-                
+              <Card
+                className={`hover:shadow-lg transition-shadow cursor-pointer ${selectedProvider?.user_id === provider.user_id ? 'border-2 border-primary' : ''}`}
+                onClick={() => handleProviderSelect(provider)}
+              >
                 <CardHeader>
-                  <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 bg-teal/20 rounded-full flex items-center justify-center flex-shrink-0">
-                      <User className="w-8 h-8 text-teal" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg truncate pr-8">{provider.business_name}</CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                          <span className="font-medium">{provider.rating}</span>
-                        </div>
-                        <span className="text-muted-foreground">({provider.total_reviews} reviews)</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <Avatar>
+                        <AvatarImage src={provider.avatar_url} />
+                        <AvatarFallback>{provider.business_name?.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <CardTitle>{provider.business_name}</CardTitle>
+                        <CardDescription className="text-muted-foreground">
+                          {provider.title || 'Service Provider'}
+                        </CardDescription>
                       </div>
-                      <Badge className="mt-2 bg-green-100 text-green-800">
-                        {provider.verification_status === 'approved' ? 'Verified' : 'Pending'}
-                      </Badge>
                     </div>
+                    {selectedProvider?.user_id === provider.user_id && (
+                      <CheckCircle className="w-6 h-6 text-green-500" />
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">{provider.description}</p>
-                    
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span>{provider.years_experience} years experience</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-muted-foreground" />
-                        <span>Available in your area</span>
-                      </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="w-4 h-4" />
+                      <span>{provider.address || 'No address'}</span>
                     </div>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-border">
-                      <div>
-                        <span className="text-2xl font-bold text-teal">${provider.hourly_rate}</span>
-                        <span className="text-muted-foreground text-sm ml-1">
-                          {selectedService.price_type === 'hourly' ? '/hr' : ''}
-                        </span>
-                      </div>
-                      <Button 
-                        onClick={() => handleProviderSelect(provider)}
-                        className="bg-teal hover:bg-teal/90"
-                      >
-                        Select Provider
-                      </Button>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-4 h-4" />
+                      <span>{provider.availability || 'Available Now'}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -376,140 +153,71 @@ const ServiceProviderFlow: React.FC<ServiceProviderFlowProps> = ({
           ))}
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={() => setCurrentStep('providers')} className="flex items-center gap-2">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Providers
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Book Your Service</h1>
-          <p className="text-muted-foreground">Complete your booking details</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Service Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Service Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+      {/* Additional Notes and Booking */}
+      {selectedProvider && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Additional Information</h2>
+          <Card>
+            <CardHeader>
+              <CardTitle>Booking Details</CardTitle>
+              <CardDescription>
+                Please provide any additional notes or special requests for the
+                provider.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
-                <h3 className="font-semibold">{selectedService.title}</h3>
-                <p className="text-sm text-muted-foreground">{selectedService.description}</p>
+                <Label htmlFor="notes">Additional Notes</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Any special requests or notes for the provider?"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
               </div>
               
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span>{selectedService.duration_minutes} min</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <User className="w-4 h-4 text-muted-foreground" />
-                  <span>{selectedProvider?.business_name}</span>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-border">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Total Price:</span>
-                  <span className="text-2xl font-bold text-teal">${selectedProvider?.hourly_rate}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Booking Form with Calendar */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Schedule Your Service</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {/* Date Selection */}
               <div>
-                <label className="block text-sm font-medium mb-3">
-                  <Calendar className="w-4 h-4 inline mr-1" />
-                  Select Date
-                </label>
-                <EnhancedCalendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateSelect}
-                  disabled={isDateDisabled}
-                  bookedSlots={existingBookings}
-                  providerId={selectedProvider?.user_id}
-                  className="w-full"
-                />
-                
-                {selectedDate && (
-                  <div className="mt-4 p-3 bg-accent/10 border border-accent/20 rounded-lg">
-                    <p className="text-sm font-medium text-foreground">
-                      Selected Date: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-                    </p>
-                  </div>
-                )}
+                <Label>Select Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-[240px] justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {date ? format(date, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="center" side="bottom">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={setDate}
+                      disabled={(date) =>
+                        date < new Date()
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
-              {/* Time Selection */}
-              {selectedDate && (
-                <div>
-                  <label className="block text-sm font-medium mb-3">
-                    <Clock className="w-4 h-4 inline mr-1" />
-                    Select Time
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {availableTimes.map((time) => {
-                      const isBooked = isTimeSlotBooked(selectedDate, time);
-                      return (
-                        <Button
-                          key={time}
-                          variant={selectedTime === time ? 'default' : 'outline'}
-                          size="sm"
-                          disabled={isBooked}
-                          className={`${isBooked ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : ''}`}
-                          onClick={() => !isBooked && setSelectedTime(time)}
-                        >
-                          {time}
-                          {isBooked && <span className="ml-1 text-xs">(Booked)</span>}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Special Instructions (Optional)
-                </label>
-                <Textarea
-                  placeholder="Any special requirements or instructions for the service provider..."
-                  value={specialInstructions}
-                  onChange={(e) => setSpecialInstructions(e.target.value)}
-                  rows={3}
-                />
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => handleAddToCart(selectedProvider)}>
+                  Add to Cart
+                </Button>
+                <Button onClick={handleBookNow} className="bg-teal hover:bg-teal/90">
+                  Book Now
+                </Button>
               </div>
-
-              <Button 
-                onClick={handleAddToCart}
-                className="w-full bg-teal hover:bg-teal/90 h-12"
-                disabled={!selectedDate || !selectedTime}
-              >
-                <ShoppingCart className="w-5 h-5 mr-2" />
-                Add to Cart - ${selectedProvider?.hourly_rate}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { User, Calendar, Heart, ShoppingCart, Star, Clock, MapPin, Bell, LogOut, DollarSign, Menu, X } from 'lucide-react';
@@ -27,6 +26,8 @@ const CustomerDashboard = () => {
   const { services, loading, error } = useServices();
   const { itemCount, loading: cartLoading } = useProductionCart();
   const isMobile = useIsMobile();
+
+  console.log('🏠 CustomerDashboard render - cart items:', itemCount, 'cart loading:', cartLoading);
 
   // Handle URL parameters and state for tab switching
   useEffect(() => {
@@ -204,6 +205,7 @@ const CustomerDashboard = () => {
         <div className="p-4 border-t border-border space-y-2">
           <button
             onClick={() => {
+              console.log('🛒 Cart button clicked - opening cart');
               setShowCart(true);
               if (isMobile) setMobileMenuOpen(false);
             }}
