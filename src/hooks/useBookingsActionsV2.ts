@@ -1,273 +1,131 @@
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
-
-interface CancelBookingParams {
-  bookingId: string;
-  reason: string;
-}
 
 export const useBookingsActionsV2 = () => {
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
 
-  // Accept booking
-  const acceptBooking = useMutation({
-    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
-      console.log('🔄 Accepting booking:', bookingId);
-      
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-
-      const { data: booking, error: fetchError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('id', bookingId)
-        .single();
-
-      if (fetchError) {
-        console.error('❌ Error fetching booking:', fetchError);
-        throw new Error('Failed to fetch booking details');
-      }
-
-      if (booking.provider_user_id !== user.id) {
-        throw new Error('You are not authorized to accept this booking');
-      }
-
-      if (booking.status !== 'confirmed') {
-        throw new Error('Only confirmed bookings can be accepted');
-      }
-
+  const acceptBooking = async (bookingId: string) => {
+    setLoading(true);
+    try {
       const { error } = await supabase
         .from('bookings')
         .update({ 
-          status: 'accepted',
-          accepted_at: new Date().toISOString()
+          status: 'confirmed',
+          confirmed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .eq('id', bookingId);
 
-      if (error) {
-        console.error('❌ Error accepting booking:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      return { bookingId, status: 'accepted' };
-    },
-    onSuccess: () => {
-      console.log('✅ Booking accepted successfully');
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
       toast({
-        title: "Booking Accepted",
-        description: "The booking has been accepted successfully.",
+        title: 'Booking Accepted',
+        description: 'You have successfully accepted this booking.',
       });
-    },
-    onError: (error) => {
-      console.error('❌ Error accepting booking:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to accept booking. Please try again.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Mark in progress
-  const markInProgress = useMutation({
-    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
-      console.log('🔄 Marking booking in progress:', bookingId);
       
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
+      return true;
+    } catch (error) {
+      console.error('Error accepting booking:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to accept booking. Please try again.',
+        variant: 'destructive'
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const { data: booking, error: fetchError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('id', bookingId)
-        .single();
-
-      if (fetchError) {
-        console.error('❌ Error fetching booking:', fetchError);
-        throw new Error('Failed to fetch booking details');
-      }
-
-      if (booking.provider_user_id !== user.id) {
-        throw new Error('You are not authorized to update this booking');
-      }
-
-      if (booking.status !== 'accepted') {
-        throw new Error('This booking cannot be marked as in progress');
-      }
-
+  const rejectBooking = async (bookingId: string, reason: string = '') => {
+    setLoading(true);
+    try {
       const { error } = await supabase
         .from('bookings')
         .update({ 
-          status: 'in_progress',
-          started_at: new Date().toISOString()
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString(),
+          cancellation_reason: reason,
+          updated_at: new Date().toISOString()
         })
         .eq('id', bookingId);
 
-      if (error) {
-        console.error('❌ Error updating booking status:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      return { bookingId, status: 'in_progress' };
-    },
-    onSuccess: () => {
-      console.log('✅ Booking marked in progress successfully');
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
       toast({
-        title: "Booking Started",
-        description: "The booking has been marked as in progress.",
+        title: 'Booking Rejected',
+        description: 'You have rejected this booking.',
       });
-    },
-    onError: (error) => {
-      console.error('❌ Error updating booking:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update booking status. Please try again.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Complete booking - Service provider marks as completed
-  const completeBooking = useMutation({
-    mutationFn: async ({ bookingId, notes }: { bookingId: string; notes?: string }) => {
-      console.log('🔄 Completing booking:', bookingId);
       
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
+      return true;
+    } catch (error) {
+      console.error('Error rejecting booking:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reject booking. Please try again.',
+        variant: 'destructive'
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const { data: booking, error: fetchError } = await supabase
+  const completeBooking = async (bookingId: string) => {
+    setLoading(true);
+    try {
+      const { data: booking } = await supabase
         .from('bookings')
-        .select('*')
+        .select('status')
         .eq('id', bookingId)
         .single();
 
-      if (fetchError) {
-        console.error('❌ Error fetching booking:', fetchError);
-        throw new Error('Failed to fetch booking details');
-      }
-
-      if (booking.provider_user_id !== user.id) {
-        throw new Error('You are not authorized to complete this booking');
-      }
-
-      if (!['accepted', 'in_progress'].includes(booking.status)) {
-        throw new Error('This booking cannot be completed');
+      if (booking?.status !== 'confirmed') {
+        toast({
+          title: 'Cannot Complete',
+          description: 'Only confirmed bookings can be marked as completed.',
+          variant: 'destructive'
+        });
+        return false;
       }
 
       const { error } = await supabase
         .from('bookings')
         .update({ 
           status: 'completed',
-          completed_at: new Date().toISOString()
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .eq('id', bookingId);
 
-      if (error) {
-        console.error('❌ Error completing booking:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      return { bookingId, status: 'completed' };
-    },
-    onSuccess: () => {
-      console.log('✅ Booking completed successfully');
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
       toast({
-        title: "Booking Completed",
-        description: "The booking has been marked as completed. Customer will be notified.",
+        title: 'Booking Completed',
+        description: 'Booking has been marked as completed.',
       });
-    },
-    onError: (error) => {
-      console.error('❌ Error completing booking:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to complete booking. Please try again.",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Cancel booking
-  const cancelBooking = useMutation({
-    mutationFn: async ({ bookingId, reason }: CancelBookingParams) => {
-      console.log('🔄 Cancelling booking:', bookingId, 'Reason:', reason);
       
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-
-      const { data: booking, error: fetchError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('id', bookingId)
-        .single();
-
-      if (fetchError) {
-        console.error('❌ Error fetching booking:', fetchError);
-        throw new Error('Failed to fetch booking details');
-      }
-
-      // FIX: use provider_user_id instead of provider_id
-      if (booking.provider_user_id !== user.id) {
-        throw new Error('You are not authorized to cancel this booking');
-      }
-
-      if (['cancelled', 'completed'].includes(booking.status)) {
-        throw new Error('This booking cannot be cancelled');
-      }
-
-      const { error } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'cancelled',
-          cancellation_reason: reason,
-          cancelled_at: new Date().toISOString()
-        })
-        .eq('id', bookingId);
-
-      if (error) {
-        console.error('❌ Error cancelling booking:', error);
-        throw error;
-      }
-
-      return { bookingId, status: 'cancelled' };
-    },
-    onSuccess: () => {
-      console.log('✅ Booking cancelled successfully');
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+      return true;
+    } catch (error) {
+      console.error('Error completing booking:', error);
       toast({
-        title: "Booking Cancelled",
-        description: "The booking has been cancelled successfully.",
+        title: 'Error',
+        description: 'Failed to complete booking. Please try again.',
+        variant: 'destructive'
       });
-    },
-    onError: (error) => {
-      console.error('❌ Error cancelling booking:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to cancel booking. Please try again.",
-        variant: "destructive",
-      });
+      return false;
+    } finally {
+      setLoading(false);
     }
-  });
+  };
 
   return {
     acceptBooking,
-    markInProgress,
+    rejectBooking,
     completeBooking,
-    cancelBooking
+    loading
   };
 };

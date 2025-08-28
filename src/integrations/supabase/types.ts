@@ -181,6 +181,27 @@ export type Database = {
           },
         ]
       }
+      favorites: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          provider_user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          provider_user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          provider_user_id?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -242,33 +263,51 @@ export type Database = {
       }
       profiles: {
         Row: {
+          address_line_1: string | null
+          address_line_2: string | null
           avatar_url: string | null
+          city: string | null
+          country: string | null
           created_at: string | null
           first_name: string | null
           id: string
           last_name: string | null
           phone: string | null
+          postal_code: string | null
           role: Database["public"]["Enums"]["app_role"] | null
+          state: string | null
           updated_at: string | null
         }
         Insert: {
+          address_line_1?: string | null
+          address_line_2?: string | null
           avatar_url?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string | null
           first_name?: string | null
           id: string
           last_name?: string | null
           phone?: string | null
+          postal_code?: string | null
           role?: Database["public"]["Enums"]["app_role"] | null
+          state?: string | null
           updated_at?: string | null
         }
         Update: {
+          address_line_1?: string | null
+          address_line_2?: string | null
           avatar_url?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
           phone?: string | null
+          postal_code?: string | null
           role?: Database["public"]["Enums"]["app_role"] | null
+          state?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -564,6 +603,38 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "verification_documents_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      verification_notes: {
+        Row: {
+          admin_id: string | null
+          created_at: string | null
+          id: string
+          note: string
+          provider_id: string | null
+        }
+        Insert: {
+          admin_id?: string | null
+          created_at?: string | null
+          id?: string
+          note: string
+          provider_id?: string | null
+        }
+        Update: {
+          admin_id?: string | null
+          created_at?: string | null
+          id?: string
+          note?: string
+          provider_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_notes_provider_id_fkey"
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "provider_profiles"

@@ -1,21 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, Star, MapPin, Clock, User, Phone, Mail } from 'lucide-react';
+import { Heart, Star, MapPin, User, Phone } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
 interface Provider {
   id: string;
   user_id: string;
   business_name: string;
   description: string;
-  hourly_rate: number;
   rating: number;
   total_reviews: number;
   business_address: string;
@@ -29,7 +27,6 @@ const FavoritesSection = () => {
   const [loading, setLoading] = useState(true);
   const { favorites, removeFromFavorites } = useFavorites();
   const { user } = useAuth();
-  const { toast } = useToast();
 
   useEffect(() => {
     loadFavoriteProviders();
@@ -160,9 +157,6 @@ const FavoritesSection = () => {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <div className="text-lg font-bold text-teal">
-                        ${provider.hourly_rate}/hr
-                      </div>
                       {provider.verification_status === 'approved' && (
                         <Badge className="bg-teal text-white">Verified</Badge>
                       )}

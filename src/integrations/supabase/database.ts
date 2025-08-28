@@ -131,6 +131,12 @@ export interface Database {
           phone: string | null;
           avatar_url: string | null;
           role: 'customer' | 'provider' | 'admin' | 'superadmin';
+          address_line_1: string | null;
+          address_line_2: string | null;
+          city: string | null;
+          state: string | null;
+          postal_code: string | null;
+          country: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -200,6 +206,40 @@ export interface Database {
           created_at: string | null;
           reviewed_at: string | null;
           reviewed_by: string | null;
+        };
+        Insert: { [key: string]: unknown };
+        Update: { [key: string]: unknown };
+      };
+      favorites: {
+        Row: {
+          id: string;
+          customer_id: string | null;
+          provider_user_id: string | null;
+          created_at: string | null;
+        };
+        Insert: { [key: string]: unknown };
+        Update: { [key: string]: unknown };
+      };
+      verification_notes: {
+        Row: {
+          id: string;
+          provider_id: string | null;
+          admin_id: string | null;
+          note: string;
+          created_at: string | null;
+        };
+        Insert: { [key: string]: unknown };
+        Update: { [key: string]: unknown };
+      };
+      provider_availability: {
+        Row: {
+          id: string;
+          provider_id: string | null;
+          date: string;
+          start_time: string;
+          end_time: string;
+          is_available: boolean | null;
+          created_at: string | null;
         };
         Insert: { [key: string]: unknown };
         Update: { [key: string]: unknown };
