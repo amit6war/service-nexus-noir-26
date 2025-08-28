@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -242,27 +243,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signUp = async (email: string, password: string, userData?: any, role: AppRole = 'customer') => {
     console.log('[Auth] Starting signup process for role:', role);
+    console.log('[Auth] User data:', userData);
     
-    try {
-      // First check if user already exists
-      const { data: existingUser } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: 'test' // This will fail if user doesn't exist
-      });
-
-      if (existingUser.user) {
-        toast({
-          title: "Account Already Exists",
-          description: "An account with this email already exists. Please sign in instead.",
-          variant: "destructive",
-        });
-        return { error: { message: "User already exists" } };
-      }
-    } catch (error) {
-      // User doesn't exist, proceed with signup
-      console.log('[Auth] User does not exist, proceeding with signup');
-    }
-
     const redirectUrl = `${window.location.origin}/`;
     
     const signupData = {
@@ -280,7 +262,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     };
 
-    console.log('[Auth] Signup data:', signupData);
+    console.log('[Auth] Signup data being sent:', signupData);
 
     const { data, error } = await supabase.auth.signUp(signupData);
 
@@ -295,6 +277,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         errorMessage = "There was a technical issue creating your account. Please try again in a moment.";
       } else if (error.message.includes('app_role')) {
         errorMessage = "Account setup is being configured. Please try again in a moment.";
+      } else if (error.message.includes('Invalid email')) {
+        errorMessage = "Please enter a valid email address.";
+      } else if (error.message.includes('Password')) {
+        errorMessage = "Password must be at least 6 characters long.";
       }
       
       toast({
