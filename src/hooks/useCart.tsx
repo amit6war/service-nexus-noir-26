@@ -39,8 +39,6 @@ export const useCart = () => {
     }
 
     try {
-      console.log('📦 Loading cart for user:', user.id);
-      
       const { data, error } = await supabase
         .from('cart_items')
         .select('*')
@@ -51,23 +49,15 @@ export const useCart = () => {
 
       if (mountedRef.current) {
         setItems(data || []);
-        console.log('✅ Cart loaded:', data?.length || 0, 'items');
       }
     } catch (error) {
       console.error('❌ Error loading cart:', error);
-      if (mountedRef.current) {
-        toast({
-          title: "Cart Error",
-          description: "Failed to load cart items.",
-          variant: "destructive",
-        });
-      }
     } finally {
       if (mountedRef.current) {
         setLoading(false);
       }
     }
-  }, [user?.id, toast]);
+  }, [user?.id]);
 
   // Initialize cart
   useEffect(() => {
@@ -111,13 +101,17 @@ export const useCart = () => {
       ...itemData
     };
 
-    // Instant UI update
+    // INSTANT UI update - users see this immediately
     setItems(prevItems => [...prevItems, optimisticItem]);
 
-    try {
-      console.log('➕ Adding item to cart:', itemData.service_name);
+    // Show success immediately
+    toast({
+      title: "Added to Cart",
+      description: `${itemData.service_name} added successfully.`,
+    });
 
-      // Make API call
+    try {
+      // Background API call
       const { data, error } = await supabase
         .from('cart_items')
         .insert({
@@ -134,16 +128,11 @@ export const useCart = () => {
         prevItems.map(item => item.id === tempId ? data : item)
       );
 
-      toast({
-        title: "Added to Cart",
-        description: `${itemData.service_name} added successfully.`,
-      });
-
       return true;
     } catch (error) {
       console.error('❌ Add item failed:', error);
       
-      // Rollback optimistic update
+      // Rollback on error
       setItems(prevItems => prevItems.filter(item => item.id !== tempId));
       
       toast({
@@ -163,12 +152,16 @@ export const useCart = () => {
     const itemToRemove = items.find(item => item.id === itemId);
     if (!itemToRemove) return false;
 
-    // Instant UI update
+    // INSTANT UI update
     setItems(prevItems => prevItems.filter(item => item.id !== itemId));
 
-    try {
-      console.log('➖ Removing item from cart:', itemId);
+    // Show success immediately
+    toast({
+      title: "Removed from Cart",
+      description: `${itemToRemove.service_name} removed successfully.`,
+    });
 
+    try {
       const { error } = await supabase
         .from('cart_items')
         .delete()
@@ -176,17 +169,11 @@ export const useCart = () => {
         .eq('user_id', user.id);
 
       if (error) throw error;
-
-      toast({
-        title: "Removed from Cart",
-        description: `${itemToRemove.service_name} removed successfully.`,
-      });
-
       return true;
     } catch (error) {
       console.error('❌ Remove item failed:', error);
       
-      // Rollback optimistic update
+      // Rollback on error
       setItems(prevItems => [...prevItems, itemToRemove]);
       
       toast({
@@ -205,29 +192,26 @@ export const useCart = () => {
 
     const originalItems = [...items];
 
-    // Instant UI update
+    // INSTANT UI update
     setItems([]);
 
-    try {
-      console.log('🧹 Clearing cart for user:', user.id);
+    toast({
+      title: "Cart Cleared",
+      description: "All items removed from cart.",
+    });
 
+    try {
       const { error } = await supabase
         .from('cart_items')
         .delete()
         .eq('user_id', user.id);
 
       if (error) throw error;
-
-      toast({
-        title: "Cart Cleared",
-        description: "All items removed from cart.",
-      });
-
       return true;
     } catch (error) {
       console.error('❌ Clear cart failed:', error);
       
-      // Rollback optimistic update
+      // Rollback on error
       setItems(originalItems);
       
       toast({

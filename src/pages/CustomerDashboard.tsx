@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { User, Calendar, Heart, ShoppingCart, Star, Clock, MapPin, Bell, LogOut, DollarSign, Menu, X } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -8,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useServices } from '@/hooks/useServices';
-import { useShoppingCart } from '@/hooks/useShoppingCart';
+import { useCart } from '@/hooks/useCart';
 import ServiceProviderFlow from '@/components/ServiceProviderFlow';
 import CartSection from '@/components/CartSection';
 import ProfileSettings from '@/components/ProfileSettings';
@@ -24,11 +23,9 @@ const CustomerDashboard = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const { user, signOut } = useAuth();
-  const { services, loading, error, silentRefresh } = useServices();
-  const { itemCount, initialized } = useShoppingCart();
+  const { services, loading, error } = useServices();
+  const { itemCount, loading: cartLoading } = useCart();
   const isMobile = useIsMobile();
-
-  console.log('🏠 CustomerDashboard render - cart itemCount:', itemCount, 'initialized:', initialized);
 
   // Handle URL parameters and state for tab switching
   useEffect(() => {
@@ -38,7 +35,6 @@ const CustomerDashboard = () => {
       setActiveTab(tabParam);
     }
     
-    // Handle navigation state
     const state = (window.history.state?.usr);
     if (state?.activeTab) {
       setActiveTab(state.activeTab);
@@ -47,42 +43,31 @@ const CustomerDashboard = () => {
     }
   }, []);
 
-  // Force re-render when cart changes by watching itemCount
-  useEffect(() => {
-    console.log('🏠 CustomerDashboard - cart count changed to:', itemCount);
-  }, [itemCount]);
-
   const handleServiceSelect = (service) => {
     setSelectedService(service);
-  };
-
-  const handleProviderSelect = (provider) => {
-    setSelectedProvider(provider);
   };
 
   const handleBookingComplete = () => {
     setSelectedService(null);
     setSelectedProvider(null);
     setActiveTab('services');
-    // Refresh services data after booking completion
-    if (silentRefresh) {
-      silentRefresh();
-    }
   };
 
   const handleSignOut = async () => {
     await signOut();
   };
 
-  // Group services by category
-  const servicesByCategory = services.reduce((acc, service) => {
-    const category = service.category || 'Other';
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    acc[category].push(service);
-    return acc;
-  }, {});
+  // Memoize grouped services to prevent unnecessary recalculations
+  const servicesByCategory = useMemo(() => {
+    return services.reduce((acc, service) => {
+      const category = service.category || 'Other';
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(service);
+      return acc;
+    }, {});
+  }, [services]);
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -225,11 +210,8 @@ const CustomerDashboard = () => {
           >
             <ShoppingCart className="w-5 h-5" />
             Cart
-            {initialized && itemCount > 0 && (
-              <Badge 
-                key={itemCount} // Force re-render when count changes
-                className="ml-auto bg-teal text-white min-w-[24px] h-6 flex items-center justify-center rounded-full"
-              >
+            {!cartLoading && itemCount > 0 && (
+              <Badge className="ml-auto bg-teal text-white min-w-[24px] h-6 flex items-center justify-center rounded-full">
                 {itemCount}
               </Badge>
             )}
@@ -245,7 +227,7 @@ const CustomerDashboard = () => {
         </div>
       </div>
 
-      {/* Main Content Area - with left margin to account for fixed sidebar */}
+      {/* Main Content Area */}
       <div className={`flex-1 ${isMobile ? 'ml-0' : 'ml-64'}`}>
         <div className="h-screen overflow-y-auto">
           <div className={`p-6 ${isMobile ? 'mt-16' : ''}`}>
@@ -362,28 +344,19 @@ const CustomerDashboard = () => {
                   setSelectedService(null);
                 }}
                 onBookService={handleBookingComplete}
-                onCartUpdate={silentRefresh}
               />
             )}
 
             {/* My Bookings */}
-            {activeTab === 'bookings' && (
-              <MyBookings />
-            )}
+            {activeTab === 'bookings' && <MyBookings />}
 
             {/* Amount Section */}
-            {activeTab === 'amount' && (
-              <AmountSection />
-            )}
+            {activeTab === 'amount' && <AmountSection />}
 
             {/* Favorites Section */}
-            {activeTab === 'favorites' && (
-              <FavoritesSection />
-            )}
+            {activeTab === 'favorites' && <FavoritesSection />}
 
-            {activeTab === 'profile' && (
-              <ProfileSettings />
-            )}
+            {activeTab === 'profile' && <ProfileSettings />}
           </div>
         </div>
       </div>
