@@ -1,376 +1,155 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Star, MapPin, Search, Clock, Shield, Award, Users } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { Search, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-interface ServiceCategory {
-  id: string;
-  name: string;
-  description: string;
-  icon_url: string | null;
-}
-
-interface FeaturedService {
-  id: string;
-  title: string;
-  description: string;
-  base_price: number;
-  duration_minutes: number;
-  provider: {
-    business_name: string;
-    rating: number;
-    total_reviews: number;
-  };
-  category: {
-    name: string;
-  };
-}
+import { useAuth } from '@/hooks/useAuth';
 
 const UrbanCompanyHome = () => {
-  const [categories, setCategories] = useState<ServiceCategory[]>([]);
-  const [featuredServices, setFeaturedServices] = useState<FeaturedService[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    loadHomeData();
-  }, []);
-
-  const loadHomeData = async () => {
-    try {
-      setLoading(true);
-
-      // Load service categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('service_categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (categoriesError) {
-        console.error('Error loading categories:', categoriesError);
-      } else {
-        setCategories(categoriesData || []);
-      }
-
-      // Load featured services with provider and category info
-      const { data: servicesData, error: servicesError } = await supabase
-        .from('services')
-        .select(`
-          id,
-          title,
-          description,
-          base_price,
-          duration_minutes,
-          provider_profiles!inner (
-            business_name,
-            rating,
-            total_reviews
-          ),
-          service_categories!inner (
-            name
-          )
-        `)
-        .eq('is_active', true)
-        .eq('is_featured', true)
-        .limit(6);
-
-      if (servicesError) {
-        console.error('Error loading featured services:', servicesError);
-      } else {
-        const formattedServices = servicesData?.map(service => ({
-          id: service.id,
-          title: service.title,
-          description: service.description || '',
-          base_price: service.base_price,
-          duration_minutes: service.duration_minutes,
-          provider: {
-            business_name: (service.provider_profiles as any)?.business_name || '',
-            rating: (service.provider_profiles as any)?.rating || 0,
-            total_reviews: (service.provider_profiles as any)?.total_reviews || 0,
-          },
-          category: {
-            name: (service.service_categories as any)?.name || '',
-          },
-        })) || [];
-        
-        setFeaturedServices(formattedServices);
-      }
-    } catch (error) {
-      console.error('Error loading home data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = () => {
-    navigate(`/services?search=${encodeURIComponent(searchQuery)}`);
-  };
-
-  const handleCategoryClick = (categoryName: string) => {
-    navigate(`/services?category=${encodeURIComponent(categoryName)}`);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </div>
-    );
-  }
+  const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary/10 via-primary/5 to-background py-16 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-4">
-            Home services, on-demand
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Trusted professionals for all your home needs. Book instantly, get quality service.
-          </p>
-          
-          {/* Search Bar */}
-          <div className="max-w-2xl mx-auto flex gap-2 mb-8">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-              <Input
-                placeholder="Search for services..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-12 text-lg"
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              />
-            </div>
-            <Button onClick={handleSearch} size="lg" className="h-12 px-8">
-              Search
-            </Button>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">10M+</div>
-              <div className="text-sm text-muted-foreground">Services delivered</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">50K+</div>
-              <div className="text-sm text-muted-foreground">Trusted professionals</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">4.8</div>
-              <div className="text-sm text-muted-foreground">Average rating</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">15min</div>
-              <div className="text-sm text-muted-foreground">Avg response time</div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-navy via-navy/90 to-teal/20">
+      {/* Header */}
+      <header className="flex items-center justify-between p-6 max-w-7xl mx-auto">
+        <div className="text-2xl font-bold text-white">
+          Service N-B
         </div>
-      </section>
-
-      {/* Service Categories */}
-      <section className="py-16 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              Popular Categories
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Choose from our wide range of home services
-            </p>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-white/80">
+            <MapPin className="w-4 h-4" />
+            <span className="text-sm">New Brunswick</span>
           </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {categories.map((category) => (
-              <Card 
-                key={category.id} 
-                className="hover:shadow-lg transition-shadow cursor-pointer border-2 hover:border-primary/20"
-                onClick={() => handleCategoryClick(category.name)}
-              >
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <div className="text-2xl">{category.name.charAt(0)}</div>
-                  </div>
-                  <h3 className="font-semibold text-sm text-foreground mb-1">
-                    {category.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {category.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search services..."
+              className="pl-10 w-64 bg-white/10 border-white/20 text-white placeholder:text-white/60"
+            />
           </div>
-        </div>
-      </section>
-
-      {/* Featured Services */}
-      <section className="py-16 px-4 bg-muted/30">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              Featured Services
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Top-rated services from our trusted professionals
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredServices.map((service) => (
-              <Card key={service.id} className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-3">
-                    <Badge variant="outline" className="text-xs">
-                      {service.category.name}
-                    </Badge>
-                    <div className="text-right">
-                      <div className="font-bold text-lg text-foreground">
-                        ${service.base_price}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {Math.floor(service.duration_minutes / 60)}h {service.duration_minutes % 60}m
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <h3 className="font-semibold text-foreground mb-2 line-clamp-2">
-                    {service.title}
-                  </h3>
-                  
-                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                    {service.description}
-                  </p>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-sm text-foreground">
-                        {service.provider.business_name}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                        {service.provider.rating.toFixed(1)} ({service.provider.total_reviews})
-                      </div>
-                    </div>
-                    <Button size="sm" onClick={() => navigate(`/service/${service.id}`)}>
-                      Book Now
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Why Choose Us */}
-      <section className="py-16 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              Why Choose Us?
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              We make home services simple, reliable, and affordable
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">Verified Professionals</h3>
-              <p className="text-sm text-muted-foreground">
-                All service providers are background-checked and verified
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">On-Time Service</h3>
-              <p className="text-sm text-muted-foreground">
-                Guaranteed on-time arrival and completion
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Award className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">Quality Assured</h3>
-              <p className="text-sm text-muted-foreground">
-                30-day service guarantee on all bookings
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">Trusted by Millions</h3>
-              <p className="text-sm text-muted-foreground">
-                Over 10 million satisfied customers nationwide
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-16 px-4 bg-primary text-primary-foreground">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-4">
-            Ready to book your service?
-          </h2>
-          <p className="text-xl mb-8 opacity-90">
-            Join millions of satisfied customers. Book your first service today.
-          </p>
-          
           {user ? (
             <Button 
-              size="lg" 
-              variant="secondary" 
-              className="text-lg px-8 py-3"
-              onClick={() => navigate('/services')}
+              variant="outline" 
+              className="border-white/20 text-white hover:bg-white/10"
+              onClick={() => navigate('/dashboard')}
             >
-              Browse Services
+              Dashboard
             </Button>
           ) : (
-            <div className="flex gap-4 justify-center">
-              <Button 
-                size="lg" 
-                variant="secondary" 
-                className="text-lg px-8 py-3"
-                onClick={() => navigate('/auth')}
-              >
-                Sign Up
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="text-lg px-8 py-3 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary"
-                onClick={() => navigate('/services')}
-              >
-                Browse Services
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              className="border-teal text-teal hover:bg-teal hover:text-white"
+              onClick={() => navigate('/auth')}
+            >
+              Sign In
+            </Button>
           )}
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="flex flex-col items-center justify-center min-h-[70vh] px-4 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
+            Find <span className="text-teal">Trusted Services</span>
+            <br />
+            in New Brunswick
+          </h1>
+          <p className="text-xl text-white/80 mb-12 max-w-2xl mx-auto">
+            Connect with verified local service providers for all your needs
+          </p>
+        </motion.div>
+
+        {/* CTA Buttons */}
+        <motion.div
+          className="flex flex-col sm:flex-row gap-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+        >
+          <Button 
+            size="lg" 
+            className="bg-teal hover:bg-teal/90 text-white px-8 py-4 text-lg"
+            onClick={() => navigate('/services')}
+          >
+            Find Services
+            <Search className="ml-2 h-5 w-5" />
+          </Button>
+          <Button 
+            size="lg" 
+            variant="outline" 
+            className="border-teal text-teal hover:bg-teal hover:text-white px-8 py-4 text-lg"
+            onClick={() => navigate('/auth')}
+          >
+            Become a Provider
+          </Button>
+        </motion.div>
+
+        {/* Stats Section */}
+        <motion.div
+          className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20 max-w-4xl mx-auto"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.4 }}
+        >
+          <div className="text-center">
+            <div className="text-3xl font-bold text-teal">500+</div>
+            <div className="text-sm text-white/60">Verified Professionals</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-teal">10K+</div>
+            <div className="text-sm text-white/60">Services Completed</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-teal">4.8</div>
+            <div className="text-sm text-white/60">Average Rating</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-teal">24/7</div>
+            <div className="text-sm text-white/60">Support Available</div>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-20 px-4">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-3 gap-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+          >
+            <div className="text-center p-6 rounded-xl bg-white/5 backdrop-blur-sm">
+              <div className="w-16 h-16 bg-teal/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="text-2xl">👤</div>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">Verified Professionals</h3>
+              <p className="text-white/70">All service providers are background-checked and verified</p>
+            </div>
+
+            <div className="text-center p-6 rounded-xl bg-white/5 backdrop-blur-sm">
+              <div className="w-16 h-16 bg-teal/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="text-2xl">⭐</div>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">Quality Assured</h3>
+              <p className="text-white/70">Rated services with customer reviews and satisfaction guarantee</p>
+            </div>
+
+            <div className="text-center p-6 rounded-xl bg-white/5 backdrop-blur-sm">
+              <div className="w-16 h-16 bg-teal/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="text-2xl">🕐</div>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">On-Time Service</h3>
+              <p className="text-white/70">Reliable professionals committed to punctuality</p>
+            </div>
+          </motion.div>
         </div>
       </section>
     </div>

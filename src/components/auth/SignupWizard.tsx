@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,33 +8,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   User, 
-  MapPin, 
-  Briefcase, 
-  CheckCircle, 
+  Mail,
+  Phone,
+  Lock,
   ArrowRight, 
   ArrowLeft,
-  Phone,
-  Mail,
-  Calendar,
-  Star,
-  Wrench,
-  Scissors,
-  Car,
-  Home,
-  Paintbrush,
-  Users
+  Upload,
+  FileText,
+  Eye,
+  EyeOff
 } from 'lucide-react';
-import Step1 from './Step1';
-import Step2 from './Step2';
-import ConfirmationPage from './ConfirmationPage';
-import ProgressIndicator from './ProgressIndicator';
 
 interface FormData {
   accountType: 'customer' | 'provider' | null;
@@ -41,24 +30,12 @@ interface FormData {
   lastName: string;
   email: string;
   phone: string;
-  dateOfBirth: string;
-  password?: string;
-  confirmPassword?: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
-  bio: string;
-  businessName?: string;
-  experience?: string;
-  services: string[];
-  hourlyRate?: string;
-  emergencyServices?: boolean;
+  gender: string;
+  password: string;
+  confirmPassword: string;
   termsAccepted: boolean;
-  gender?: string;
-  fullName?: string;
-  location?: string;
+  idProofFile?: File | null;
+  licenseFile?: File | null;
 }
 
 const initialFormData: FormData = {
@@ -67,62 +44,13 @@ const initialFormData: FormData = {
   lastName: '',
   email: '',
   phone: '',
-  dateOfBirth: '',
-  address: '',
-  city: '',
-  state: '',
-  zipCode: '',
-  country: 'US',
-  bio: '',
-  services: [],
-  termsAccepted: false,
   gender: '',
-  fullName: '',
-  location: '',
+  password: '',
+  confirmPassword: '',
+  termsAccepted: false,
+  idProofFile: null,
+  licenseFile: null,
 };
-
-const serviceCategories = [
-  {
-    name: 'Home Repair',
-    icon: Home,
-    subcategories: ['Plumbing', 'Electrical', 'Carpentry', 'Painting']
-  },
-  {
-    name: 'Automotive',
-    icon: Car,
-    subcategories: ['Mechanic', 'Detailing', 'Towing']
-  },
-  {
-    name: 'Beauty & Personal Care',
-    icon: Scissors,
-    subcategories: ['Hair Styling', 'Makeup', 'Nail Care']
-  },
-  {
-    name: 'Handyman Services',
-    icon: Wrench,
-    subcategories: ['General Repairs', 'Installation', 'Assembly']
-  },
-  {
-    name: 'Cleaning Services',
-    icon: Paintbrush,
-    subcategories: ['House Cleaning', 'Office Cleaning', 'Deep Cleaning']
-  },
-  {
-    name: 'Pet Care',
-    icon: Star,
-    subcategories: ['Grooming', 'Walking', 'Sitting']
-  },
-  {
-    name: 'Tutoring',
-    icon: Users,
-    subcategories: ['Math', 'Science', 'English']
-  },
-  {
-    name: 'Event Planning',
-    icon: Calendar,
-    subcategories: ['Catering', 'Decor', 'Music']
-  }
-];
 
 interface SignupWizardProps {
   onBack?: () => void;
@@ -133,24 +61,19 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [licenseFile, setLicenseFile] = useState<File | null>(null);
-  const [idFile, setIdFile] = useState<File | null>(null);
-  const [additionalFile, setAdditionalFile] = useState<File | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signUp } = useAuth();
 
-  const progress = currentStep === 1 ? 20 : 
-                   currentStep === 2 ? 40 : 
-                   currentStep === 3 ? 60 :
-                   currentStep === 4 ? 80 : 100;
+  const progress = currentStep === 1 ? 33 : currentStep === 2 ? 66 : 100;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const target = e.target as HTMLInputElement | HTMLTextAreaElement;
-    const { name, value, type } = target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
     
     if (type === 'checkbox') {
-      const checked = (target as HTMLInputElement).checked;
+      const checked = (e.target as HTMLInputElement).checked;
       setFormData(prev => ({
         ...prev,
         [name]: checked
@@ -163,53 +86,12 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
     }
   };
 
-  const handleServiceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value, checked } = e.target;
-    setFormData(prev => {
-      let newServices = [...prev.services];
-      if (checked) {
-        newServices.push(value);
-      } else {
-        newServices = newServices.filter(service => service !== value);
-      }
-      return { ...prev, services: newServices };
-    });
-  };
-
-  const handleGenderChange = (gender: string) => {
-    setFormData(prev => ({ ...prev, gender }));
-  };
-
-  const handleUseCurrentLocation = () => {
-    setLocating(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          // In a real app, you'd reverse geocode this to get the address
-          setFormData(prev => ({
-            ...prev,
-            location: `${position.coords.latitude}, ${position.coords.longitude}`
-          }));
-          setLocating(false);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          setLocating(false);
-          toast({
-            title: "Location Error",
-            description: "Unable to get your current location.",
-            variant: "destructive",
-          });
-        }
-      );
-    } else {
-      setLocating(false);
-      toast({
-        title: "Geolocation Not Supported",
-        description: "Your browser doesn't support geolocation.",
-        variant: "destructive",
-      });
-    }
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
+    const file = e.target.files?.[0] || null;
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: file
+    }));
   };
 
   const handleAccountTypeNext = () => {
@@ -224,8 +106,8 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
     setCurrentStep(2);
   };
 
-  const handlePersonalInfoNext = async () => {
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
+  const handlePersonalInfoNext = () => {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.gender) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields.",
@@ -234,10 +116,10 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
       return;
     }
 
-    if (formData.accountType === 'provider' && (!formData.businessName || !formData.experience || formData.services.length === 0)) {
+    if (formData.accountType === 'provider' && (!formData.idProofFile || !formData.licenseFile)) {
       toast({
-        title: "Provider Information Required",
-        description: "Please complete all provider information fields.",
+        title: "Documents Required",
+        description: "Please upload both ID proof and license documents.",
         variant: "destructive",
       });
       return;
@@ -246,120 +128,58 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
     setCurrentStep(3);
   };
 
-  const handleLocationNext = () => {
-    if (!formData.address || !formData.city || !formData.state || !formData.zipCode) {
+  const handleSubmit = async () => {
+    if (!formData.password || !formData.confirmPassword) {
       toast({
-        title: "Address Required",
-        description: "Please complete your address information.",
+        title: "Password Required",
+        description: "Please enter and confirm your password.",
         variant: "destructive",
       });
       return;
     }
-    setCurrentStep(4);
-  };
 
-  const handleSubmit = async () => {
+    if (formData.password !== formData.confirmPassword) {
+      toast({
+        title: "Password Mismatch",
+        description: "Passwords do not match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.termsAccepted) {
+      toast({
+        title: "Terms Required",
+        description: "Please accept the terms and conditions.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
-      // Sign up the user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-          }
-        }
-      });
-
-      if (authError) {
-        console.error('Auth error:', authError);
-        toast({
-          title: "Signup Failed",
-          description: authError.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!authData.user) {
-        throw new Error('No user data returned from signup');
-      }
-
-      // Create profile with proper role typing
-      const profileData = {
-        id: authData.user.id,
+      const userData = {
         first_name: formData.firstName,
         last_name: formData.lastName,
         phone: formData.phone,
-        role: formData.accountType === 'provider' ? 'provider' as const : 'customer' as const, // Use 'customer' as default, will be updated to 'provider' after verification
-        address_line_1: formData.address,
-        city: formData.city,
-        state: formData.state,
-        postal_code: formData.zipCode,
-        country: formData.country,
-        avatar_url: null,
-        address_line_2: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        gender: formData.gender,
       };
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert(profileData);
+      const { error } = await signUp(
+        formData.email, 
+        formData.password, 
+        userData, 
+        formData.accountType || 'customer'
+      );
 
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
+      if (!error) {
         toast({
-          title: "Profile Creation Failed",
-          description: profileError.message,
-          variant: "destructive",
+          title: "Account Created Successfully!",
+          description: "Please check your email to verify your account.",
         });
-        return;
+        onSuccess?.();
       }
-
-      // If provider, create provider profile
-      if (formData.accountType === 'provider') {
-        const providerData = {
-          user_id: authData.user.id,
-          business_name: formData.businessName!,
-          description: formData.bio || '',
-          years_experience: parseInt(formData.experience!) || 0,
-          verification_status: 'pending' as const,
-          rating: 0,
-          total_reviews: 0,
-          emergency_passes: 3,
-          is_active: true,
-          business_address: formData.address,
-          business_phone: formData.phone,
-          business_email: formData.email,
-          portfolio_images: [],
-        };
-
-        const { error: providerError } = await supabase
-          .from('provider_profiles')
-          .insert(providerData);
-
-        if (providerError) {
-          console.error('Provider profile creation error:', providerError);
-          toast({
-            title: "Provider Profile Creation Failed",
-            description: providerError.message,
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-
-      toast({
-        title: "Account Created Successfully!",
-        description: "Please check your email to verify your account.",
-      });
-
-      setCurrentStep(5);
-      onSuccess?.();
     } catch (error) {
       console.error('Signup error:', error);
       toast({
@@ -373,57 +193,235 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal/5 to-blue/5 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-navy via-navy/90 to-teal/20 flex items-center justify-center p-4">
       <motion.div 
         className="w-full max-w-2xl"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Card className="shadow-lg border-0">
-          <CardHeader className="pb-2 pt-6">
-            <CardTitle className="text-3xl font-bold text-center">
-              Create Your Account
+        <Card className="shadow-2xl border-0 bg-card/95 backdrop-blur-sm">
+          <CardHeader className="pb-4 pt-8">
+            <CardTitle className="text-3xl font-bold text-center text-foreground">
+              Join Service N-B
             </CardTitle>
-            <ProgressIndicator currentStep={currentStep} totalSteps={5} />
+            <div className="text-center text-muted-foreground">
+              Step {currentStep} of 3
+            </div>
           </CardHeader>
           <CardContent className="p-8">
-            <Progress value={progress} className="mb-4 h-2" />
+            <Progress value={progress} className="mb-8 h-2" />
+            
             <AnimatePresence mode="wait">
+              {/* Step 1: Account Type Selection */}
               {currentStep === 1 && (
-                <Step1 
-                  formData={{
-                    email: formData.email,
-                    phone: formData.phone,
-                    password: formData.password || ''
-                  }}
-                  selectedRole={formData.accountType === 'provider' ? 'provider' : 'customer'}
-                  showPassword={false}
-                  onInputChange={handleChange}
-                  onRoleChange={(role) => setFormData(prev => ({ ...prev, accountType: role }))}
-                  onTogglePassword={() => {}}
-                />
+                <motion.div
+                  key="step1"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6"
+                >
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Choose Your Account Type</h3>
+                    <p className="text-muted-foreground">Are you looking for services or providing them?</p>
+                  </div>
+
+                  <RadioGroup
+                    value={formData.accountType || ''}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, accountType: value as 'customer' | 'provider' }))}
+                    className="grid gap-4"
+                  >
+                    <motion.label 
+                      htmlFor="role-customer" 
+                      className="flex items-center gap-4 rounded-xl border-2 border-border bg-card/50 px-6 py-4 cursor-pointer hover:bg-card transition-all duration-300 hover:border-teal/50 hover:shadow-lg"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <RadioGroupItem id="role-customer" value="customer" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <User className="w-5 h-5 text-teal" />
+                          <span className="font-semibold text-foreground">Customer</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">Find and book trusted services</p>
+                      </div>
+                    </motion.label>
+
+                    <motion.label 
+                      htmlFor="role-provider" 
+                      className="flex items-center gap-4 rounded-xl border-2 border-border bg-card/50 px-6 py-4 cursor-pointer hover:bg-card transition-all duration-300 hover:border-teal/50 hover:shadow-lg"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <RadioGroupItem id="role-provider" value="provider" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-5 h-5 text-teal" />
+                          <span className="font-semibold text-foreground">Service Provider</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">Offer your professional services</p>
+                      </div>
+                    </motion.label>
+                  </RadioGroup>
+
+                  <div className="flex justify-between mt-8">
+                    <Button variant="outline" onClick={onBack}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+                    <Button onClick={handleAccountTypeNext} className="bg-teal hover:bg-teal/90">
+                      Next
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </motion.div>
               )}
+
+              {/* Step 2: Personal Information */}
               {currentStep === 2 && (
-                <Step2
-                  formData={{
-                    fullName: `${formData.firstName} ${formData.lastName}`,
-                    gender: formData.gender || '',
-                    location: formData.location || `${formData.city}, ${formData.state}`
-                  }}
-                  selectedRole={formData.accountType === 'provider' ? 'provider' : 'customer'}
-                  locating={locating}
-                  licenseFile={licenseFile}
-                  idFile={idFile}
-                  additionalFile={additionalFile}
-                  onInputChange={handleChange}
-                  onGenderChange={handleGenderChange}
-                  onUseCurrentLocation={handleUseCurrentLocation}
-                  onLicenseFileChange={setLicenseFile}
-                  onIdFileChange={setIdFile}
-                  onAdditionalFileChange={setAdditionalFile}
-                />
+                <motion.div
+                  key="step2"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6"
+                >
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Personal Information</h3>
+                    <p className="text-muted-foreground">Tell us about yourself</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="firstName">First Name *</Label>
+                      <Input 
+                        type="text" 
+                        id="firstName" 
+                        name="firstName" 
+                        value={formData.firstName} 
+                        onChange={handleChange} 
+                        placeholder="Enter first name"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="lastName">Last Name *</Label>
+                      <Input 
+                        type="text" 
+                        id="lastName" 
+                        name="lastName" 
+                        value={formData.lastName} 
+                        onChange={handleChange} 
+                        placeholder="Enter last name"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="email">Email Address *</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        placeholder="Enter your email"
+                        className="pl-10 mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="phone">Phone Number *</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="tel"
+                        id="phone"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="Enter your phone number"
+                        className="pl-10 mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="gender">Gender *</Label>
+                    <select
+                      id="gender"
+                      name="gender"
+                      value={formData.gender}
+                      onChange={handleChange}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
+                    >
+                      <option value="">Select gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                      <option value="prefer_not_to_say">Prefer not to say</option>
+                    </select>
+                  </div>
+
+                  {/* File uploads for service providers */}
+                  {formData.accountType === 'provider' && (
+                    <div className="space-y-4 p-4 bg-secondary/30 rounded-lg">
+                      <h4 className="font-semibold text-foreground flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-teal" />
+                        Required Documents
+                      </h4>
+                      
+                      <div>
+                        <Label htmlFor="idProof">ID Proof (Government Issued) *</Label>
+                        <Input
+                          type="file"
+                          id="idProof"
+                          accept="image/*,application/pdf"
+                          onChange={(e) => handleFileChange(e, 'idProofFile')}
+                          className="mt-1"
+                        />
+                        {formData.idProofFile && (
+                          <p className="text-xs text-teal mt-1">✓ {formData.idProofFile.name}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="license">Professional License/Certificate *</Label>
+                        <Input
+                          type="file"
+                          id="license"
+                          accept="image/*,application/pdf"
+                          onChange={(e) => handleFileChange(e, 'licenseFile')}
+                          className="mt-1"
+                        />
+                        {formData.licenseFile && (
+                          <p className="text-xs text-teal mt-1">✓ {formData.licenseFile.name}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between mt-8">
+                    <Button variant="outline" onClick={() => setCurrentStep(1)}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+                    <Button onClick={handlePersonalInfoNext} className="bg-teal hover:bg-teal/90">
+                      Next
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </motion.div>
               )}
+
+              {/* Step 3: Password and Terms */}
               {currentStep === 3 && (
                 <motion.div
                   key="step3"
@@ -431,152 +429,83 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.3 }}
+                  className="space-y-6"
                 >
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="address">Address</Label>
-                        <Input 
-                          type="text" 
-                          id="address" 
-                          name="address" 
-                          value={formData.address} 
-                          onChange={handleChange} 
-                          placeholder="123 Main St"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="city">City</Label>
-                        <Input 
-                          type="text" 
-                          id="city" 
-                          name="city" 
-                          value={formData.city} 
-                          onChange={handleChange} 
-                          placeholder="Anytown"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="state">State</Label>
-                        <Input 
-                          type="text" 
-                          id="state" 
-                          name="state" 
-                          value={formData.state} 
-                          onChange={handleChange} 
-                          placeholder="CA"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="zipCode">Zip Code</Label>
-                        <Input 
-                          type="text" 
-                          id="zipCode" 
-                          name="zipCode" 
-                          value={formData.zipCode} 
-                          onChange={handleChange} 
-                          placeholder="90210"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="country">Country</Label>
-                      <Input 
-                        type="text" 
-                        id="country" 
-                        name="country" 
-                        value={formData.country} 
-                        onChange={handleChange} 
-                        placeholder="US"
-                        disabled
-                      />
-                    </div>
-                    <div className="flex justify-between">
-                      <Button variant="outline" onClick={() => setCurrentStep(2)}>
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back
-                      </Button>
-                      <Button onClick={handleLocationNext}>
-                        Next
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Create Your Password</h3>
+                    <p className="text-muted-foreground">Secure your account</p>
                   </div>
-                </motion.div>
-              )}
-              {currentStep === 4 && (
-                <motion.div
-                  key="step4"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="password">Password</Label>
-                      <Input 
-                        type="password" 
-                        id="password" 
-                        name="password" 
-                        onChange={handleChange} 
-                        placeholder="Enter password"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="confirmPassword">Confirm Password</Label>
-                      <Input 
-                        type="password" 
-                        id="confirmPassword" 
-                        name="confirmPassword" 
-                        onChange={handleChange} 
-                        placeholder="Confirm password"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea
-                        id="bio"
-                        name="bio"
-                        value={formData.bio}
+
+                  <div>
+                    <Label htmlFor="password">Password *</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        id="password"
+                        name="password"
+                        value={formData.password}
                         onChange={handleChange}
-                        placeholder="Tell us a little about yourself"
+                        placeholder="Enter your password"
+                        className="pl-10 pr-12 mt-1"
                       />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="terms" 
-                        name="termsAccepted" 
-                        checked={formData.termsAccepted} 
-                        onCheckedChange={(checked) => 
-                          setFormData(prev => ({ ...prev, termsAccepted: !!checked }))
-                        }
-                      />
-                      <Label htmlFor="terms">I agree to the terms and conditions</Label>
-                    </div>
-                    <div className="flex justify-between">
-                      <Button variant="outline" onClick={() => setCurrentStep(3)}>
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back
-                      </Button>
-                      <Button disabled={isSubmitting} onClick={handleSubmit}>
-                        {isSubmitting ? "Submitting..." : "Create Account"}
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-teal transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
+
+                  <div>
+                    <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        placeholder="Confirm your password"
+                        className="pl-10 pr-12 mt-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-teal transition-colors"
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="terms" 
+                      name="termsAccepted" 
+                      checked={formData.termsAccepted} 
+                      onCheckedChange={(checked) => 
+                        setFormData(prev => ({ ...prev, termsAccepted: !!checked }))
+                      }
+                    />
+                    <Label htmlFor="terms" className="text-sm">
+                      I agree to the <span className="text-teal hover:underline cursor-pointer">Terms and Conditions</span>
+                    </Label>
+                  </div>
+
+                  <div className="flex justify-between mt-8">
+                    <Button variant="outline" onClick={() => setCurrentStep(2)}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+                    <Button disabled={isSubmitting} onClick={handleSubmit} className="bg-teal hover:bg-teal/90">
+                      {isSubmitting ? "Creating Account..." : "Create Account"}
+                    </Button>
+                  </div>
                 </motion.div>
-              )}
-              {currentStep === 5 && (
-                <ConfirmationPage 
-                  type="success"
-                  onBackToHome={() => navigate('/')}
-                  onContinueToSignIn={() => navigate('/auth')}
-                  onResendConfirmation={() => {}}
-                  email={formData.email}
-                />
               )}
             </AnimatePresence>
           </CardContent>
