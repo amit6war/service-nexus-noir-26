@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 
-type AppRole = 'customer' | 'provider' | 'admin';
+type AppRole = 'customer' | 'provider' | 'admin' | 'superadmin';
 
 interface AuthContextType {
   user: User | null;
@@ -67,6 +67,27 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const role = data.role as AppRole;
         console.log('[Auth] Profile role detected:', role);
         setProfileRole(role);
+        
+        // Navigate based on role after successful authentication
+        setTimeout(() => {
+          const currentPath = window.location.pathname;
+          if (currentPath === '/auth' || currentPath === '/') {
+            switch (role) {
+              case 'customer':
+                window.location.href = '/customer-dashboard';
+                break;
+              case 'provider':
+                window.location.href = '/provider-dashboard';
+                break;
+              case 'admin':
+              case 'superadmin':
+                window.location.href = '/admin-dashboard';
+                break;
+              default:
+                window.location.href = '/';
+            }
+          }
+        }, 100);
       } else {
         console.log('[Auth] No role found in profile, defaulting to customer');
         setProfileRole('customer');
@@ -241,9 +262,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     if (error) {
       console.error('[Auth] Signup error:', error);
+      
+      let errorMessage = error.message;
+      
+      if (error.message.includes('User already registered')) {
+        errorMessage = "An account with this email already exists. Please use a different email or sign in instead.";
+      }
+      
       toast({
         title: "Sign Up Failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } else {

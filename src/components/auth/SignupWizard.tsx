@@ -35,7 +35,6 @@ interface FormData {
   confirmPassword: string;
   termsAccepted: boolean;
   idProofFile?: File | null;
-  licenseFile?: File | null;
 }
 
 const initialFormData: FormData = {
@@ -49,7 +48,6 @@ const initialFormData: FormData = {
   confirmPassword: '',
   termsAccepted: false,
   idProofFile: null,
-  licenseFile: null,
 };
 
 interface SignupWizardProps {
@@ -116,10 +114,11 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
       return;
     }
 
-    if (formData.accountType === 'provider' && (!formData.idProofFile || !formData.licenseFile)) {
+    // Only require ID proof for service providers, no license file needed during signup
+    if (formData.accountType === 'provider' && !formData.idProofFile) {
       toast({
-        title: "Documents Required",
-        description: "Please upload both ID proof and license documents.",
+        title: "Document Required",
+        description: "Please upload ID proof document.",
         variant: "destructive",
       });
       return;
@@ -370,12 +369,12 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
                     </select>
                   </div>
 
-                  {/* File uploads for service providers */}
+                  {/* File uploads for service providers - only ID proof required */}
                   {formData.accountType === 'provider' && (
                     <div className="space-y-4 p-4 bg-secondary/30 rounded-lg">
                       <h4 className="font-semibold text-foreground flex items-center gap-2">
                         <Upload className="w-4 h-4 text-teal" />
-                        Required Documents
+                        Required Document
                       </h4>
                       
                       <div>
@@ -390,20 +389,9 @@ const SignupWizard = ({ onBack, onSuccess }: SignupWizardProps) => {
                         {formData.idProofFile && (
                           <p className="text-xs text-teal mt-1">✓ {formData.idProofFile.name}</p>
                         )}
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="license">Professional License/Certificate *</Label>
-                        <Input
-                          type="file"
-                          id="license"
-                          accept="image/*,application/pdf"
-                          onChange={(e) => handleFileChange(e, 'licenseFile')}
-                          className="mt-1"
-                        />
-                        {formData.licenseFile && (
-                          <p className="text-xs text-teal mt-1">✓ {formData.licenseFile.name}</p>
-                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Note: Professional licenses can be uploaded later from your provider dashboard
+                        </p>
                       </div>
                     </div>
                   )}
